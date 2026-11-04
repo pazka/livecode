@@ -380,7 +380,9 @@ function startRoom(roomId: string) {
       const n = dots[f].length;
       t.setAttribute(
         "aria-label",
-        `${FILE_NAMES[f]} (${FILE_LABELS[f]})${n ? `, ${n} ${n === 1 ? "other person" : "other people"} here` : ""}`,
+        `${FILE_NAMES[f]} (${FILE_LABELS[f]})${
+          n ? `, ${n} ${n === 1 ? "other person" : "other people"} here` : ""
+        }`,
       );
     }
     renderStatus();
@@ -728,7 +730,9 @@ function startRoom(roomId: string) {
     const resolved = THEMES.find((t) => t.id === document.documentElement.dataset.theme);
     $("sb-keymap").textContent = `Keymap: ${preset.label.replace(/ \(.*\)$/, "")}`;
     $("sb-keymap").setAttribute("aria-label", `Keymap ${preset.label}: switch keymap`);
-    $("sb-theme").textContent = s.theme === "system" ? `Theme: System (${resolved?.label ?? ""})` : `Theme: ${theme?.label}`;
+    $("sb-theme").textContent = s.theme === "system"
+      ? `Theme: System (${resolved?.label ?? ""})`
+      : `Theme: ${theme?.label}`;
     $("sb-theme").setAttribute("aria-label", `${$("sb-theme").textContent}: switch theme`);
     $("sb-indent").textContent = `${s.tabSize} spaces`;
     $("sb-indent").setAttribute("aria-label", `Indent ${s.tabSize} spaces: open editor settings`);
@@ -758,7 +762,11 @@ function startRoom(roomId: string) {
     if (b) settings.update({ previewScheme: b.dataset.scheme as Settings["previewScheme"] });
   });
   schemeSeg.addEventListener("keydown", (e) => {
-    const dir = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    const dir = e.key === "ArrowRight" || e.key === "ArrowDown"
+      ? 1
+      : e.key === "ArrowLeft" || e.key === "ArrowUp"
+      ? -1
+      : 0;
     if (!dir) return;
     e.preventDefault();
     const i = schemeButtons.findIndex((b) => b.getAttribute("aria-checked") === "true");

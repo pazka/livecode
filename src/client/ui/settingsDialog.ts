@@ -106,7 +106,10 @@ export class SettingsDialog {
       this.showSection(tabs[n].id, true);
     });
     const scheme = $<HTMLSelectElement>("set-preview-scheme");
-    scheme.addEventListener("change", () => s.update({ previewScheme: scheme.value as "system" | "light" | "dark" }));
+    scheme.addEventListener(
+      "change",
+      () => s.update({ previewScheme: scheme.value as "system" | "light" | "dark" }),
+    );
     const theme = $<HTMLSelectElement>("set-theme");
     theme.replaceChildren(...THEME_CHOICES.map((t) => h("option", { value: t.id, text: t.label })));
     theme.addEventListener("change", () => s.update({ theme: theme.value }));
