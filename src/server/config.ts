@@ -23,7 +23,15 @@ export const ENV_VARS = [
 ] as const;
 
 /** Read by dependencies at import (lib0: colours, production flag). Harmless; allowed in the binary too. */
-export const LIBRARY_ENV_VARS = ["PRODUCTION", "NO_COLOR", "FORCE_COLOR", "COLORTERM", "TERM", "LOG", "NODE_ENV"];
+export const LIBRARY_ENV_VARS = [
+  "PRODUCTION",
+  "NO_COLOR",
+  "FORCE_COLOR",
+  "COLORTERM",
+  "TERM",
+  "LOG",
+  "NODE_ENV",
+];
 
 export interface Limits {
   /** Rooms kept on disk; beyond it, new rooms are refused (existing ones keep working). */

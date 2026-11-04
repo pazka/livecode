@@ -4,7 +4,7 @@
 import * as Y from "yjs";
 import { EditorView } from "@codemirror/view";
 import { Vim } from "@replit/codemirror-vim";
-import { type FileId, FILES, isRoomId, type Notice } from "../shared/protocol.ts";
+import { type FileId, FILES, isRoomId, MAX_FILE_CHARS, type Notice } from "../shared/protocol.ts";
 import { ALL_COMMANDS, APP_COMMANDS, COMMAND_BY_ID } from "./commands.ts";
 import { composeDocument } from "./compose.ts";
 import { FILE_LABELS, SharedEditor } from "./editors.ts";
@@ -156,7 +156,9 @@ function startRoom(roomId: string) {
     limitNoticeAt = Date.now();
     showNotice({
       code: "file-too-large",
-      message: `${FILE_LABELS[f]} is at its size limit (${MAX_FILE_CHARS / 1024} K characters): that edit was not applied.`,
+      message: `${FILE_LABELS[f]} is at its size limit (${
+        MAX_FILE_CHARS / 1024
+      } K characters): that edit was not applied.`,
     });
   }
 

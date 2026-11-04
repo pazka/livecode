@@ -275,7 +275,9 @@ export class Room {
     }, "limit");
     conn.send(encodeNotice(
       "file-too-large",
-      `${over.map((f) => f.toUpperCase()).join(", ")} is over the limit of ${Math.round(max / 1024)} K characters: cut back.`,
+      `${over.map((f) => f.toUpperCase()).join(", ")} is over the limit of ${
+        Math.round(max / 1024)
+      } K characters: cut back.`,
     ));
   }
 
