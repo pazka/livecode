@@ -28,7 +28,6 @@ jobs:
           set -euo pipefail
           if [ -f deno.lock ]; then cp deno.lock /tmp/deno.lock.before; fi
           deno install --frozen=false
-          deno install --frozen=false --entrypoint src/server/main.ts src/client/main.ts tests/*.ts e2e/*.ts
           cp deno.lock /tmp/deno.lock
       - name: Format (produces fmt.patch)
         run: |
