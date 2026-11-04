@@ -30,6 +30,7 @@ import { css } from "@codemirror/lang-css";
 import { javascript } from "@codemirror/lang-javascript";
 import { vim } from "@replit/codemirror-vim";
 import { emacs } from "@replit/codemirror-emacs";
+import "./vendor/emacs-commands.js"; // the package's keys + commands, which minifying drops (see file)
 import { yCollab, ySyncAnnotation } from "y-codemirror.next";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
@@ -45,7 +46,9 @@ const language = (f: FileId): Extension =>
 /** `cm-hasSelection` on the editor while any range is non-empty (themes.ts: the caret line steps aside). */
 const selectionClass = EditorView.editorAttributes.compute(
   ["selection"],
-  (s): Record<string, string> => (s.selection.ranges.some((r) => !r.empty) ? { class: "cm-hasSelection" } : {}),
+  (
+    s,
+  ): Record<string, string> => (s.selection.ranges.some((r) => !r.empty) ? { class: "cm-hasSelection" } : {}),
 );
 
 /** Remote edits (y-codemirror's sync annotation) never enter the local undo history. */

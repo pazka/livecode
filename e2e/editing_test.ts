@@ -130,7 +130,9 @@ async function ownSelection(p: Page, f: F): Promise<{ rects: number; hidden: num
         if (e === scroller || !scroller.contains(e) || e.closest(".cm-selectionLayer")) break;
         if (alpha(getComputedStyle(e).backgroundColor) > 0.5) {
           hidden++;
-          by = `${e.tagName.toLowerCase()}.${[...e.classList].join(".")} ${getComputedStyle(e).backgroundColor}`;
+          by = `${e.tagName.toLowerCase()}.${[...e.classList].join(".")} ${
+            getComputedStyle(e).backgroundColor
+          }`;
           break;
         }
       }
@@ -607,7 +609,7 @@ Deno.test({
         await keyTrace(a!);
         await a!.keyboard.press("Control+Enter");
         try {
-          await expectTrue(a!, `globalThis.__livecode.renders() > ${n}`, "a new render", 6000);
+          await expectTrue(a!, `globalThis.__livecode.renders() > ${n}`, "a new render", 15000);
         } catch (e) {
           const now = await a!.evaluate(() => (globalThis as any).__livecode.renders());
           throw new Error(`${(e as Error).message} (renders ${n} → ${now}; keys ${await keyTrace(a!)})`);

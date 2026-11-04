@@ -44,11 +44,13 @@
       "e2e/"
     ],
     "exclude": [
-      "src/server/assets.gen.ts"
+      "src/server/assets.gen.ts",
+      "src/client/vendor/"
     ]
   },
   "lint": {
     "exclude": [
+      "src/client/vendor/",
       "web/",
       "dist/",
       "src/server/assets.gen.ts"
