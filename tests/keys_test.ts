@@ -45,6 +45,26 @@ Deno.test("keys: events match like CodeMirror (char first, then physical key)", 
   assert(eventStrokes(ev(" ", "Space", { ctrl: true })).includes("Ctrl-Space"));
 });
 
+Deno.test("keys: no shortcut swallowing on other layouts (owner X.18)", () => {
+  // AZERTY: the Q key sits where QWERTY has A — Ctrl+Q must not become Ctrl-a (select all)
+  assertEquals(eventStrokes(ev("q", "KeyA", { ctrl: true })), ["Ctrl-q"]);
+  // AZERTY Ctrl+W / QWERTZ Ctrl+Y: the layout letter, never the physical Ctrl-z (undo)
+  assertEquals(eventStrokes(ev("w", "KeyZ", { ctrl: true })), ["Ctrl-w"]);
+  assertEquals(eventStrokes(ev("y", "KeyZ", { ctrl: true })), ["Ctrl-y"]);
+  // Windows AltGr (= Ctrl+Alt) typing "ł" (Polish), "[" / "@" (AZERTY): text, not Ctrl-Alt-l (reformat)
+  const altGr = (key: string, code: string) => ({
+    ...ev(key, code, { ctrl: true, alt: true }),
+    getModifierState: (k: string) => k === "AltGraph",
+  });
+  assertEquals(eventStrokes(altGr("ł", "KeyL")), []);
+  assertEquals(eventStrokes(altGr("[", "Digit5")), []);
+  assertEquals(eventStrokes(altGr("@", "Digit0")), []);
+  // a real Ctrl+Alt+L (no AltGr) still reformats
+  assert(eventStrokes(ev("l", "KeyL", { ctrl: true, alt: true })).includes("Alt-Ctrl-l"));
+  // Cyrillic layout: Ctrl + "ф" (the A key) still reaches Ctrl-a, like CodeMirror
+  assert(eventStrokes(ev("ф", "KeyA", { ctrl: true })).includes("Ctrl-a"));
+});
+
 Deno.test("keys: recorder stores the physical key with Mod", () => {
   assertEquals(recordStroke(ev("P", "KeyP", { ctrl: true, shift: true }), false), "Mod-Shift-p");
   assertEquals(recordStroke(ev("p", "KeyP", { meta: true }), true), "Mod-p");

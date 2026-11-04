@@ -33,9 +33,31 @@ import {
   selectNextOccurrence,
   selectSelectionMatches,
 } from "@codemirror/search";
-import { foldAll, foldCode, unfoldAll, unfoldCode } from "@codemirror/language";
+import { foldAll, foldCode, indentRange, unfoldAll, unfoldCode } from "@codemirror/language";
 import { startCompletion } from "@codemirror/autocomplete";
 import type { Command as CMCommand } from "@codemirror/view";
+
+/**
+ * Format: with a selection, re-indent the selected lines; without one, the whole file — every line
+ * re-indented from the language's syntax tree and trailing spaces trimmed (VS Code Shift+Alt+F, JetBrains
+ * Ctrl+Alt+L). One undo step.
+ */
+export const formatCode: CMCommand = (view) => {
+  const { state } = view;
+  if (state.readOnly) return false;
+  if (state.selection.ranges.some((r) => !r.empty)) return indentSelection(view);
+  const doc = state.doc;
+  const indent = indentRange(state, 0, doc.length);
+  const trims: { from: number; to: number }[] = [];
+  for (let i = 1; i <= doc.lines; i++) {
+    const line = doc.line(i);
+    const m = /\S(\s+)$/.exec(line.text);
+    if (m) trims.push({ from: line.to - m[1].length, to: line.to });
+  }
+  const changes = indent.compose(state.changes(trims).map(indent));
+  if (!changes.empty) view.dispatch({ changes, userEvent: "format", scrollIntoView: false });
+  return true;
+};
 
 export type Group = "Edit" | "Selection" | "Search" | "Fold" | "Files" | "Preview" | "View" | "Room" | "Help";
 
@@ -76,7 +98,7 @@ export const EDITOR_COMMANDS: EditorCommand[] = [
   ed("insertBlankLine", "Insert line below", "Edit", insertBlankLine),
   ed("indentMore", "Indent", "Edit", indentMore),
   ed("indentLess", "Outdent", "Edit", indentLess),
-  ed("reindent", "Re-indent selection", "Edit", indentSelection),
+  ed("reindent", "Format file (or re-indent the selection)", "Edit", formatCode),
   ed("startCompletion", "Show completions", "Edit", startCompletion),
   ed("selectAll", "Select all", "Selection", selectAll),
   ed("selectLine", "Select line", "Selection", selectLine),
@@ -132,4 +154,7 @@ export const COMMAND_BY_ID: ReadonlyMap<string, EditorCommand | AppCommand> = ne
 );
 
 /** CodeMirror functions the presets manage: default keymaps binding them are filtered out (keymaps.ts). */
-export const MANAGED_RUNS: ReadonlySet<CMCommand> = new Set(EDITOR_COMMANDS.map((c) => c.run));
+export const MANAGED_RUNS: ReadonlySet<CMCommand> = new Set([
+  ...EDITOR_COMMANDS.map((c) => c.run),
+  indentSelection, // behind "reindent" (formatCode)
+]);

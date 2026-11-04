@@ -3,6 +3,8 @@
 
 import * as Y from "yjs";
 import { EditorView } from "@codemirror/view";
+import { completionStatus } from "@codemirror/autocomplete";
+import { searchPanelOpen } from "@codemirror/search";
 import { Vim } from "@replit/codemirror-vim";
 import { type FileId, FILES, isRoomId, MAX_FILE_CHARS, type Notice } from "../shared/protocol.ts";
 import { ALL_COMMANDS, APP_COMMANDS, COMMAND_BY_ID } from "./commands.ts";
@@ -421,7 +423,7 @@ function startRoom(roomId: string) {
   }
 
   function setUser(s: Settings) {
-    awareness.setLocalStateField("user", { name: s.name, color: s.color, colorLight: `${s.color}33` });
+    awareness.setLocalStateField("user", { name: s.name, color: s.color, colorLight: `${s.color}55` });
   }
   setUser(settings.get());
   selectTab("html", false);
@@ -577,19 +579,28 @@ function startRoom(roomId: string) {
     pending = null;
     clearTimeout(pendingTimer);
   };
-  function focusedEditor(target: EventTarget | null): EditorView | null {
+  /** The editor the key is for: its text (`inPanel` false) or one of its panels, e.g. the search field. */
+  function editorAt(target: EventTarget | null): { view: EditorView; inPanel: boolean } | null {
+    if (!(target instanceof Node)) return null;
     for (const f of FILES) {
       const v = editors[f].view;
-      if (target instanceof Node && v.dom.contains(target)) return v;
+      if (v.dom.contains(target)) return { view: v, inPanel: !v.contentDOM.contains(target) };
     }
     return null;
+  }
+  /** Keys CodeMirror's own open UI needs first: the completion list, and Escape closing the search panel. */
+  const UI_KEYS = new Set(["Escape", "Enter", "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Tab"]);
+  function editorUiWants(v: EditorView, stroke: string): boolean {
+    if (!UI_KEYS.has(stroke)) return false;
+    return completionStatus(v.state) !== null || (stroke === "Escape" && searchPanelOpen(v.state));
   }
   document.addEventListener("keydown", (e) => {
     if (keysSuspended || e.isComposing || e.defaultPrevented) return;
     const strokes = eventStrokes(e);
     if (!strokes.length) return;
     const target = e.target as HTMLElement | null;
-    const view = focusedEditor(target);
+    const hit = editorAt(target);
+    const view = hit && !hit.inPanel ? hit.view : null;
     const inField = !view && !!target?.closest?.("input, textarea, select, [contenteditable]");
     const tries = pending ? strokes.map((s) => `${pending} ${s}`) : strokes;
     for (const k of tries) {
@@ -597,10 +608,16 @@ function startRoom(roomId: string) {
       if (!id) continue;
       if (!pending && inField && isPlainKey(k)) continue;
       const c = COMMAND_BY_ID.get(id);
-      // editor commands only act inside an editor; elsewhere the key keeps its normal meaning
-      if (c?.kind === "editor" && !view) continue;
+      // editor commands only act inside an editor's text; elsewhere the key keeps its normal meaning. In an
+      // editor panel (the search field) only the search commands run: Ctrl+A, Ctrl+Z, Escape … are the field's.
+      let onView: EditorView | null = null;
+      if (c?.kind === "editor") {
+        onView = view ?? (hit?.inPanel && c.group === "Search" ? hit.view : null);
+        if (!onView) continue;
+        if (!pending && editorUiWants(onView, k)) continue;
+      }
       clearPending();
-      if (runCommand(id, view)) {
+      if (runCommand(id, onView)) {
         e.preventDefault();
         e.stopPropagation();
       }

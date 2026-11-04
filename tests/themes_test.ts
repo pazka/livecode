@@ -64,6 +64,9 @@ for (const t of THEMES) {
       ["fg", v.fg, v.bg, text],
       ["fg on panel", v.fg, v.panel, text],
       ["fg on selection", v.fg, v.sel, text],
+      // the selection must be seen (owner bug X.18): against the page and against the caret line
+      ["selection vs background", v.sel, v.bg, 1.4],
+      ["selection vs active line", v.sel, v.line, 1.2],
       ["muted", v.muted, v.bg, text],
       ["muted on panel", v.muted, v.panel, text],
       ["muted on active line", v.muted, v.line, text],

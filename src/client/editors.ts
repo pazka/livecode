@@ -42,6 +42,12 @@ export const FILE_LABELS: Record<FileId, string> = { html: "HTML", css: "CSS", j
 const language = (f: FileId): Extension =>
   f === "html" ? html({ autoCloseTags: true }) : f === "css" ? css() : javascript();
 
+/** `cm-hasSelection` on the editor while any range is non-empty (themes.ts: the caret line steps aside). */
+const selectionClass = EditorView.editorAttributes.compute(
+  ["selection"],
+  (s) => (s.selection.ranges.some((r) => !r.empty) ? { class: "cm-hasSelection" } : {}),
+);
+
 /** Remote edits (y-codemirror's sync annotation) never enter the local undo history. */
 const remoteNotInHistory = EditorState.transactionExtender.of((tr) =>
   tr.annotation(ySyncAnnotation) !== undefined ? { annotations: Transaction.addToHistory.of(false) } : null
@@ -103,6 +109,7 @@ export class SharedEditor {
         rectangularSelection(),
         crosshairCursor(),
         highlightActiveLine(),
+        selectionClass,
         highlightSelectionMatches(),
         search({ top: true }),
         keymap.of(fallbackKeymap()),

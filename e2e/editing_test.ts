@@ -71,12 +71,12 @@ async function expectTrue(p: Page, fn: string, what: string, timeout = 3000) {
 async function reset(p: Page, f: F, content: string) {
   await p.bringToFront();
   await p.evaluate(() => document.querySelectorAll("dialog[open]").forEach((d) => (d as HTMLDialogElement).close()));
+  await p.click(`#tab-${f}`, { timeout: 5000 });
   const close = p.locator(`#panel-${f} .cm-search button[name=close]`);
-  if (await close.count()) await close.first().click();
-  await p.click(`#tab-${f}`);
+  if (await close.count()) await close.first().click({ timeout: 5000 });
   await hook(p).setText(f, content);
   await expectText(p, f, content, "reset");
-  await p.click(`#panel-${f} .cm-content`, { position: { x: 3, y: 8 } });
+  await p.click(`#panel-${f} .cm-content`, { position: { x: 3, y: 8 }, timeout: 5000 });
   await p.keyboard.press("Control+Home");
   await sleep(60);
 }
@@ -136,7 +136,12 @@ async function ownSelection(p: Page, f: F): Promise<{ rects: number; hidden: num
 }
 
 async function expectOwnSelectionVisible(p: Page, f: F) {
-  const s = await ownSelection(p, f);
+  // CodeMirror draws the selection layer on its next measure cycle: wait for it
+  let s = await ownSelection(p, f);
+  for (let i = 0; i < 20 && s.rects === 0; i++) {
+    await sleep(75);
+    s = await ownSelection(p, f);
+  }
   if (s.rects === 0) throw new Error("no selection drawn at all");
   if (s.hidden) throw new Error(`${s.hidden} of ${s.rects} selection rectangle(s) painted over (invisible)`);
 }
@@ -239,8 +244,10 @@ Deno.test({
       await ready(b);
       await a.waitForFunction(() => (globalThis as any).__livecode.peers() === 2);
       // pin both to light + VS Code keys; B stays on the HTML tab and watches
-      await setSettings(a, { theme: "light", keymap: "vscode" });
-      await setSettings(b, { theme: "light", keymap: "vscode" });
+      // no live preview while testing: the scratch JS below is not meant to run
+      await setSettings(a, { theme: "light", keymap: "vscode", autoRun: false });
+      await setSettings(b, { theme: "light", keymap: "vscode", autoRun: false });
+      for (const f of ["css", "js"] as F[]) await hook(a).setText(f, "");
       await a.waitForFunction(() => (globalThis as any).__livecode.peers() === 2);
 
       const PAGE = "<main>\n<h1>Hello world</h1>\n<p>alpha beta gamma</p>\n</main>";
@@ -393,10 +400,13 @@ Deno.test({
         await reset(a!, "js", "");
         await a!.keyboard.type("mine");
         await expectText(b, "js", "mine", "peer");
-        await b.evaluate(() => {
-          const lc = (globalThis as any).__livecode;
-          lc.setText("js", lc.text("js") + "\n// theirs");
-        });
+        // B types for real, on a line of its own
+        await b.bringToFront();
+        await b.click("#tab-js");
+        await b.click("#panel-js .cm-content", { position: { x: 3, y: 8 } });
+        await b.keyboard.press("Control+End");
+        await b.keyboard.press("Enter");
+        await b.keyboard.type("// theirs");
         await expectText(a!, "js", "mine\n// theirs");
         await a!.bringToFront();
         await a!.keyboard.press("Control+KeyZ");
@@ -530,6 +540,7 @@ Deno.test({
         await expectTrue(a!, `document.querySelector("#tab-html").getAttribute("aria-selected") === "true"`, "HTML");
       });
       await check("app keys in the editor: Ctrl+Enter runs the preview", async () => {
+        await hook(a!).setText("js", "");
         await reset(a!, "html", PAGE);
         const n = await a!.evaluate(() => (globalThis as any).__livecode.renders());
         await a!.keyboard.press("Control+Enter");
@@ -612,11 +623,14 @@ Deno.test({
       await setSettings(a, { keymap: "emacs" });
       await check("Emacs: Ctrl+E / Ctrl+A move to line end / start (Ctrl+A is not select-all)", async () => {
         await reset(a!, "html", "alpha beta\ngamma");
+        const mode = await a!.evaluate(() => !!document.querySelector("#panel-html .cm-emacsMode"));
         await a!.keyboard.press("Control+KeyE");
         await a!.keyboard.type("!");
+        const afterE = await hook(a!).text("html");
         await a!.keyboard.press("Control+KeyA");
         await a!.keyboard.type("^");
-        await expectText(a!, "html", "^alpha beta!\ngamma");
+        await shot(a!, "emacs-01");
+        await expectText(a!, "html", "^alpha beta!\ngamma", `emacs mode on: ${mode}, after C-e "!": ${JSON.stringify(afterE)}`);
       });
       await check("Emacs: Ctrl+Space mark + Ctrl+F selects visibly; Ctrl+W kills, Ctrl+Y yanks", async () => {
         await reset(a!, "html", "alpha beta");

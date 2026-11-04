@@ -109,6 +109,7 @@ interface KeyEventLike {
   ctrlKey: boolean;
   metaKey: boolean;
   shiftKey: boolean;
+  getModifierState?: (key: string) => boolean;
 }
 
 function withMods(key: string, e: KeyEventLike, shift: boolean): string {
@@ -129,9 +130,15 @@ function withMods(key: string, e: KeyEventLike, shift: boolean): string {
 export function eventStrokes(e: KeyEventLike): string[] {
   if (MODIFIER_KEYS.has(e.key)) return [];
   const isChar = [...e.key].length === 1 && e.key !== " ";
+  // AltGr typed a character (Windows reports AltGr as Ctrl+Alt): that is text — "ł", "[", "@" … — never a
+  // shortcut (CodeMirror does the same)
+  if (isChar && e.getModifierState?.("AltGraph")) return [];
   const out = [withMods(e.key, e, !isChar)];
   const base = baseKey(e.code);
-  if (base && (isChar || e.key === " ") && (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey)) {
+  // the layout's own letters win: AZERTY Ctrl+Q is Ctrl-q, never the physical key's Ctrl-a. The physical
+  // key is only a fallback when a modifier changed the character (macOS ⌥1 = "¡", AZERTY digits, Cyrillic)
+  const layoutLetter = /^[a-z]$/i.test(e.key);
+  if (base && !layoutLetter && (isChar || e.key === " ") && (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey)) {
     const b = withMods(base, e, true);
     if (!out.includes(b)) out.push(b);
   }

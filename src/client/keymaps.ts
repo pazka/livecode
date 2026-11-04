@@ -171,8 +171,9 @@ export const PRESETS: Preset[] = [
       run: ["Shift-F10", "Mod-Enter", "Mod-s"],
       toggleAutoRun: [],
       toggleConsole: ["Alt-4"],
-      nextTab: ["Alt-ArrowRight"],
-      prevTab: ["Alt-ArrowLeft"],
+      // Alt+←/→ is word-jump on macOS: JetBrains for Mac switches tabs with ⌘⇧] / ⌘⇧[
+      nextTab: IS_MAC ? ["Mod-Shift-]"] : ["Alt-ArrowRight"],
+      prevTab: IS_MAC ? ["Mod-Shift-["] : ["Alt-ArrowLeft"],
       palette: ["Mod-Shift-a", "F1"],
       settings: ["Mod-Alt-s"],
       cycleTheme: ["Ctrl-`"],

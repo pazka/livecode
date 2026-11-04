@@ -59,6 +59,9 @@ export const editorTheme = EditorView.theme({
     backgroundColor: "var(--sel) !important",
   },
   ".cm-activeLine": { backgroundColor: "var(--line)" },
+  // CodeMirror paints the selection BEHIND the text lines: an opaque caret-line background would hide it
+  // (owner bug X.18). While something is selected the caret line is not highlighted — like JetBrains.
+  "&.cm-hasSelection .cm-activeLine": { backgroundColor: "transparent" },
   ".cm-activeLineGutter": { backgroundColor: "var(--line)", color: "var(--fg)" },
   ".cm-gutters": {
     backgroundColor: "var(--bg)",
