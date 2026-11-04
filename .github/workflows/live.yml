@@ -1,0 +1,57 @@
+name: live
+
+# Drives the DEPLOYED site with two real browsers (e2e/editing_test.ts, LIVECODE_URL set): selections,
+# clipboard, Enter, format, keys that must not be swallowed, JetBrains / Vim / Emacs. Read-mostly: it opens
+# one throwaway room (emptied at the end, idle-collected after 7 days by the server).
+# Runs by hand (Actions → live), after every release deploy (release.yml), and on agent/** pushes that
+# change the e2e files (to test a new check against production before the fix ships).
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Site to test"
+        default: "https://code.hosh.it"
+        required: true
+  workflow_call:
+    inputs:
+      url:
+        type: string
+        default: "https://code.hosh.it"
+  push:
+    branches: ['agent/**']
+    paths: ['e2e/**', '.github/workflows/live.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Deno 2.9.8 (pinned, checksum-verified)
+        run: |
+          set -euo pipefail
+          url=https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-unknown-linux-gnu.zip
+          curl -fsSL -o /tmp/deno.zip "$url"
+          echo "e890975bc2549807bbcc0b584ffafda72cc7c93349dd99c80483dd784f6c4609  /tmp/deno.zip" | sha256sum -c -
+          sudo unzip -o -q /tmp/deno.zip -d /usr/local/bin && deno --version
+      - run: deno ci            # frozen lockfile, minimum dependency age, no install scripts
+      - run: deno task build    # the test file imports the server modules (unused against a live site)
+      - name: e2e against the live site
+        env:
+          LIVECODE_URL: ${{ inputs.url || 'https://code.hosh.it' }}
+          SCREENSHOT_DIR: /tmp/shots
+          REPORT_FILE: /tmp/shots/editing-report.txt
+        run: CHROME_PATH="$(command -v google-chrome || command -v chromium)" deno test --allow-all e2e/editing_test.ts
+      - name: screenshots + report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: live-shots
+          path: /tmp/shots/
+          if-no-files-found: ignore

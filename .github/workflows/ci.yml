@@ -38,7 +38,16 @@ jobs:
       - run: deno task check
       - run: deno task test
       - name: e2e (headless Chrome, software GL)
-        run: CHROME_PATH="$(command -v google-chrome || command -v chromium)" deno task e2e
+        run: |
+          SCREENSHOT_DIR=/tmp/shots REPORT_FILE=/tmp/shots/editing-report.txt \
+            CHROME_PATH="$(command -v google-chrome || command -v chromium)" deno task e2e
+      - name: e2e screenshots + editing report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-shots
+          path: /tmp/shots/
+          if-no-files-found: ignore
 
   image:
     needs: test

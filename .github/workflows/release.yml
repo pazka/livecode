@@ -145,3 +145,8 @@ jobs:
     with:
       version: ${{ needs.release.outputs.tag }}
     secrets: inherit
+
+  # After the deploy: the editing e2e against the live site (two real browsers on https://code.hosh.it).
+  live:
+    needs: deploy
+    uses: ./.github/workflows/live.yml
