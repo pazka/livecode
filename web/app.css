@@ -493,7 +493,8 @@ textarea { font-family: var(--mono); width: 100%; }
 }
 .urlbar h2 { font-size: 1em; margin: 0; color: var(--fg); font-weight: 600; }
 .urlbar #preview-status { overflow: hidden; text-overflow: ellipsis; }
-.preview-frames { position: relative; flex: 1; min-height: 0; background: Canvas; color-scheme: light; }
+/* the page is rendered like a plain browser tab: the OS scheme, never the editor theme, nothing added */
+.preview-frames { position: relative; flex: 1; min-height: 0; background: Canvas; color-scheme: light dark; }
 .preview-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
 .preview-frame.pending { visibility: hidden; }
 .with-count .count { position: absolute; top: -2px; right: -4px; }

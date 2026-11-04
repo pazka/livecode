@@ -755,43 +755,10 @@ function startRoom(roomId: string) {
     $("sb-indent").setAttribute("aria-label", `Indent ${s.tabSize} spaces: open editor settings`);
   }
 
-  // --- colour scheme of the previewed page: never the editor theme's ---
-  const schemeSeg = $("scheme-seg");
-  const schemeButtons = [...schemeSeg.querySelectorAll<HTMLButtonElement>("[role=radio]")];
-  function applyPreviewScheme(s: Settings) {
-    const used = s.previewScheme === "system"
-      ? (mq("(prefers-color-scheme: dark)") ? "dark" : "light")
-      : s.previewScheme;
-    // an iframe takes its preferred colour scheme from its element: set it here, apart from the app theme
-    $("preview-frames").style.colorScheme = used;
-    for (const b of schemeButtons) {
-      const on = b.dataset.scheme === s.previewScheme;
-      b.setAttribute("aria-checked", String(on));
-      b.tabIndex = on ? 0 : -1;
-    }
-  }
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    applyPreviewScheme(settings.get());
-    renderStatusBar(settings.get());
-  });
-  schemeSeg.addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-scheme]");
-    if (b) settings.update({ previewScheme: b.dataset.scheme as Settings["previewScheme"] });
-  });
-  schemeSeg.addEventListener("keydown", (e) => {
-    const dir = e.key === "ArrowRight" || e.key === "ArrowDown"
-      ? 1
-      : e.key === "ArrowLeft" || e.key === "ArrowUp"
-      ? -1
-      : 0;
-    if (!dir) return;
-    e.preventDefault();
-    const i = schemeButtons.findIndex((b) => b.getAttribute("aria-checked") === "true");
-    const next = schemeButtons[(i + dir + schemeButtons.length) % schemeButtons.length];
-    settings.update({ previewScheme: next.dataset.scheme as Settings["previewScheme"] });
-    next.focus();
-    announce(next.getAttribute("aria-label") ?? "");
-  });
+  // The previewed page gets NO colour-scheme handling of ours: its frame host is `color-scheme: light dark`
+  // in app.css, which is exactly what a top-level tab gets (the OS preference reaches the page's
+  // prefers-color-scheme, the default canvas when the page declares nothing) and never the editor theme.
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => renderStatusBar(settings.get()));
 
   function labelButtons() {
     const set = (id: string, cmd: string, base: string) => {
@@ -821,7 +788,6 @@ function startRoom(roomId: string) {
 
   function applyAll(s: Settings, prev?: Settings) {
     applyTheme(s);
-    applyPreviewScheme(s);
     applyLayout(s);
     bindings = effectiveBindings(s.keymap, s.overrides[s.keymap]);
     matcher = makeMatcher(bindings);

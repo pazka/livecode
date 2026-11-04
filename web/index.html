@@ -116,14 +116,6 @@
           <span id="preview-status" class="muted" aria-live="polite"></span>
         </div>
         <span class="spacer"></span>
-        <div class="seg" role="radiogroup" aria-label="Colour scheme of the page" id="scheme-seg">
-          <button type="button" role="radio" data-scheme="system" aria-label="Page follows the system colour scheme" title="Follow the system">
-            <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path class="fill" d="M8 2.5a5.5 5.5 0 010 11z"/></svg></button>
-          <button type="button" role="radio" data-scheme="light" aria-label="Page in light scheme" title="Light page">
-            <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button>
-          <button type="button" role="radio" data-scheme="dark" aria-label="Page in dark scheme" title="Dark page">
-            <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 9.6A5.5 5.5 0 016.4 3a5.5 5.5 0 106.6 6.6z"/></svg></button>
-        </div>
         <button type="button" id="console-btn" class="icon-btn with-count" aria-expanded="false" aria-controls="console"
           aria-label="Console">
           <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M4.5 6l2 2-2 2M8 10.5h3.5"/></svg>
@@ -186,12 +178,6 @@
         <fieldset id="sec-appearance" role="tabpanel" aria-labelledby="st-appearance">
           <legend>Appearance</legend>
           <div class="field"><label for="set-theme">Theme of the editor</label><select id="set-theme"></select></div>
-          <div class="field"><label for="set-preview-scheme">Colour scheme of the previewed page</label>
-            <select id="set-preview-scheme" aria-describedby="scheme-hint">
-              <option value="system">Follow the system (like a normal browser tab)</option>
-              <option value="light">Light</option><option value="dark">Dark</option></select>
-            <p id="scheme-hint" class="hint">Independent of the editor theme: the page looks as it would for a
-              visitor.</p></div>
           <div class="field"><label for="set-font">Editor font size</label>
             <input id="set-font" type="number" min="10" max="32" step="1"> px</div>
           <div class="field"><label for="set-layout">Layout</label>

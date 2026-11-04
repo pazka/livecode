@@ -141,26 +141,43 @@ Deno.test({
       await a.waitForFunction(() => (globalThis as any).__livecode.theme() === "hc-dark");
       assertEquals(await b.evaluate(() => (globalThis as any).__livecode.theme()), before);
 
-      // the page in the preview is NOT restyled by the editor theme (owner bug, X.17): the starter CSS says
-      // `color-scheme: light dark`; with a light OS the text stays black under a dark editor theme …
-      const bodyColor = async (p: Page) =>
-        (await previewFrame(p)).evaluate(() => getComputedStyle(document.body).color);
-      const expectColor = async (p: Page, want: string) => {
-        // the scheme reaches the out-of-process frame asynchronously: poll briefly
-        let got = "";
-        for (let i = 0; i < 40 && got !== want; i++) {
-          got = await bodyColor(p);
-          if (got !== want) await new Promise((r) => setTimeout(r, 100));
+      // raw rendering (owner, X.17 + X.19): the preview adds no colour-scheme handling and no CSS — the page
+      // renders like a plain browser tab. A page that declares nothing stays light (black text) even under a
+      // dark editor theme AND a dark OS; the OS preference still reaches its prefers-color-scheme.
+      const frameState = async (p: Page) =>
+        (await previewFrame(p)).evaluate(() => ({
+          color: getComputedStyle(document.body).color,
+          scheme: getComputedStyle(document.documentElement).colorScheme,
+          styles: document.querySelectorAll("style, link[rel=stylesheet]").length,
+          dark: matchMedia("(prefers-color-scheme: dark)").matches,
+          quirks: document.compatMode === "BackCompat",
+        }));
+      const expectFrame = async (p: Page, want: Record<string, unknown>) => {
+        // frames are replaced on every refresh and the scheme reaches them asynchronously: poll
+        let got: Record<string, unknown> = {};
+        for (let i = 0; i < 60; i++) {
+          try {
+            got = await frameState(p);
+          } catch { /* frame swapped mid-read */ }
+          if (Object.entries(want).every(([k, v]) => got[k] === v)) return;
+          await new Promise((r) => setTimeout(r, 100));
         }
-        assertEquals(got, want);
+        assertEquals(got, { ...got, ...want });
       };
-      await expectColor(a, "rgb(0, 0, 0)");
+      await a.emulateMedia({ colorScheme: "dark" });
+      // the HTML here is a bare fragment: rendered as a browser renders such a file (no doctype → quirks)
+      await expectFrame(a, { color: "rgb(0, 0, 0)", scheme: "normal", dark: true, styles: 1, quirks: true });
       await shot(a, "04-room-hc-dark");
-      // … and the page's own scheme switch changes it, live
-      await a.click('#scheme-seg [data-scheme="dark"]');
-      await expectColor(a, "rgb(255, 255, 255)");
-      await a.click('#scheme-seg [data-scheme="system"]');
-      await expectColor(a, "rgb(0, 0, 0)");
+      // the workshop exercise: the page implements light/dark itself, in its CSS
+      await a.evaluate(() =>
+        (globalThis as any).__livecode.setText(
+          "css",
+          ":root { color-scheme: light dark; }\n@media (prefers-color-scheme: dark) { body { color: rgb(255, 255, 255); } }",
+        )
+      );
+      await expectFrame(a, { color: "rgb(255, 255, 255)", scheme: "light dark", dark: true, styles: 1 });
+      await a.emulateMedia({ colorScheme: "light" });
+      await expectFrame(a, { color: "rgb(0, 0, 0)", dark: false });
 
       // a dark theme for the screenshots, by the status bar widget
       await a.click("#sb-theme");

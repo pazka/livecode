@@ -105,11 +105,6 @@ export class SettingsDialog {
       e.preventDefault();
       this.showSection(tabs[n].id, true);
     });
-    const scheme = $<HTMLSelectElement>("set-preview-scheme");
-    scheme.addEventListener(
-      "change",
-      () => s.update({ previewScheme: scheme.value as "system" | "light" | "dark" }),
-    );
     const theme = $<HTMLSelectElement>("set-theme");
     theme.replaceChildren(...THEME_CHOICES.map((t) => h("option", { value: t.id, text: t.label })));
     theme.addEventListener("change", () => s.update({ theme: theme.value }));
@@ -232,7 +227,6 @@ export class SettingsDialog {
     set("set-tab", String(v.tabSize));
     set("set-delay", String(v.previewDelay));
     set("set-layout", v.layout);
-    set("set-preview-scheme", v.previewScheme);
     set("set-vimrc", v.vimrc);
     $<HTMLInputElement>("set-wrap").checked = v.lineWrap;
     $("vimrc-field").hidden = v.keymap !== "vim";

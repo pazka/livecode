@@ -2,16 +2,25 @@
 // same time never get the starter twice).
 
 export const STARTER = {
-  html: `<main>
-  <h1>Hello, live code!</h1>
-  <p>Everyone in this room edits the same page. Change anything: the preview refreshes for all.</p>
-  <button id="btn" type="button">Click me</button>
-  <p id="out" aria-live="polite"></p>
-</main>
+  html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live code</title>
+</head>
+<body>
+  <main>
+    <h1>Hello, live code!</h1>
+    <p>Everyone in this room edits the same page. Change anything: the preview refreshes for all.</p>
+    <button id="btn" type="button">Click me</button>
+    <p id="out" aria-live="polite"></p>
+  </main>
+</body>
+</html>
 `,
   css: `:root {
   font-family: system-ui, sans-serif;
-  color-scheme: light dark;
 }
 
 main {

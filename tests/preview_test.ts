@@ -37,14 +37,19 @@ Deno.test("loop guard: half-typed code is left alone", () => {
   }
 });
 
-Deno.test("compose: fragment becomes a full document, runtime first, CSS in head, JS last", () => {
+Deno.test("compose: a fragment stays raw (nothing wrapped or added), runtime first, CSS, then JS", () => {
   const html = composeDocument({
     html: "<h1>Hi</h1>",
     css: "h1{color:red}",
     js: "console.log(1)",
     jsModule: false,
   });
-  assert(html.startsWith("<!DOCTYPE html>"));
+  // raw rendering (owner X.19): no doctype, meta, html/head/body or style of ours
+  assert(html.startsWith("<script>"), html.slice(0, 40));
+  for (const added of ["<!DOCTYPE", "<meta", "<html", "<head", "<body", "color-scheme"]) {
+    assert(!html.toLowerCase().includes(added.toLowerCase()), `added ${added}`);
+  }
+  assertEquals((html.match(/<style>/g) ?? []).length, 1); // the user's own CSS file, nothing else
   const iRuntime = html.indexOf(RUNTIME.slice(0, 40));
   const iCss = html.indexOf("h1{color:red}");
   const iBody = html.indexOf("<h1>Hi</h1>");
@@ -53,7 +58,17 @@ Deno.test("compose: fragment becomes a full document, runtime first, CSS in head
     iRuntime > 0 && iRuntime < iCss && iCss < iBody && iBody < iJs,
     `${iRuntime} ${iCss} ${iBody} ${iJs}`,
   );
-  assertStringIncludes(html, "<script>console.log(1)\n//# sourceURL=livecode-script.js\n</script></body>");
+  assert(html.endsWith("<script>console.log(1)\n//# sourceURL=livecode-script.js\n</script>"));
+});
+
+Deno.test("compose: a doctype'd fragment keeps its doctype first (standards mode)", () => {
+  const out = composeDocument({ html: "<!doctype html><p>x</p>", css: "p{}", js: "", jsModule: false });
+  assert(out.startsWith("<!doctype html><script>"), out.slice(0, 40));
+  assert(!out.includes("<meta") && !out.includes("<head"));
+});
+
+Deno.test("compose: the runtime adds no styles", () => {
+  assert(!/<style|\.style\b|colorScheme|color-scheme|adoptedStyleSheets/.test(RUNTIME));
 });
 
 Deno.test("compose: full document keeps its structure; module mode; closing tags escaped", () => {

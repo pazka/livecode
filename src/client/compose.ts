@@ -1,6 +1,8 @@
 // Builds the preview document from the three files: the runtime first (console capture, errors, heartbeat,
-// loop guard), the CSS in <head>, the JS (loop-guarded) at the end of <body>. Works with a full document
-// or a bare fragment in the HTML file.
+// loop guard — a script, no styles), the CSS in <head>, the JS (loop-guarded) at the end of <body>.
+// Raw rendering (owner, X.19): nothing else is added — no doctype, meta, wrapper or CSS of ours. A bare
+// fragment is left to the browser exactly like a file with that content would be (no doctype = quirks
+// mode, implied html/head/body), so what the preview shows is what a browser tab shows.
 
 import { guardLoops } from "./loopguard.ts";
 
@@ -93,10 +95,11 @@ export function composeDocument(src: Sources, opts: { guard?: boolean } = {}): s
       const at = root.index + root[0].length;
       html = html.slice(0, at) + `<head>${headBits}</head>` + html.slice(at);
     } else {
+      // a fragment (maybe after a doctype): the scripts/styles go first and the parser puts them in the
+      // implied <head>, as it would for a file; never before the doctype (that would switch to quirks mode)
       const doctype = html.match(/^\s*<!doctype[^>]*>/i);
-      const rest = doctype ? html.slice(doctype[0].length) : html;
-      html = `<!DOCTYPE html><html><head><meta charset="utf-8">` +
-        `<meta name="viewport" content="width=device-width, initial-scale=1">${headBits}</head><body>${rest}</body></html>`;
+      const at = doctype ? doctype[0].length : 0;
+      html = html.slice(0, at) + headBits + html.slice(at);
     }
   }
   if (script) {
