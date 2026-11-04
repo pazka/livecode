@@ -240,6 +240,7 @@ export class Room {
           }
           Y.applyUpdate(this.doc, upd, conn);
           this.bytes += upd.length;
+          this.enforceFileLimit(conn);
         } else {
           return this.refuse(conn, "bad-message", "Unknown sync message.");
         }
@@ -256,6 +257,26 @@ export class Room {
     } catch {
       return this.refuse(conn, "bad-message", "Undecodable message.");
     }
+  }
+
+  /**
+   * Per-file limit: a file longer than maxFileChars is cut back by the server (a normal edit, so every client
+   * converges on it). The editor refuses such input itself; only a modified client ever gets here.
+   */
+  private enforceFileLimit(conn: Conn) {
+    const max = this.limits.maxFileChars;
+    const over = FILES.filter((f) => this.doc.getText(f).length > max);
+    if (over.length === 0) return;
+    this.doc.transact(() => {
+      for (const f of over) {
+        const t = this.doc.getText(f);
+        t.delete(max, t.length - max);
+      }
+    }, "limit");
+    conn.send(encodeNotice(
+      "file-too-large",
+      `${over.map((f) => f.toUpperCase()).join(", ")} is over the limit of ${Math.round(max / 1024)} K characters: cut back.`,
+    ));
   }
 
   /** Size gate. The running estimate only grows; recompute exactly before refusing anything. */
@@ -303,6 +324,9 @@ export class RoomManager {
 
   /** Connection-level admission (before the room is touched). Returns a refusal or null. */
   admit(conn: Conn): Notice | null {
+    if (this.overMemory()) {
+      return { code: "server-full", message: "The server is busy: try again in a minute." };
+    }
     if (this.total >= this.limits.maxConns) {
       return { code: "server-full", message: "The server is at capacity: try again later." };
     }
@@ -320,6 +344,24 @@ export class RoomManager {
     if (n <= 0) this.perIp.delete(conn.ip);
     else this.perIp.set(conn.ip, n);
   }
+
+  /** Process memory above the guard (Deno.memoryUsage is cheap; cached for a second). */
+  private rssAt = 0;
+  private rss = 0;
+  overMemory(): boolean {
+    const now = Date.now();
+    if (now - this.rssAt > 1000) {
+      this.rssAt = now;
+      try {
+        this.rss = Deno.memoryUsage().rss;
+      } catch {
+        this.rss = 0;
+      }
+    }
+    return this.rss > this.limits.maxRssBytes;
+  }
+
+  private createdTotal: number[] = [];
 
   private unsavedLive(): number {
     let n = 0;
@@ -341,9 +383,15 @@ export class RoomManager {
   }
 
   private async load(id: string, ip: string): Promise<Room | Notice> {
+    if (this.rooms.size >= this.limits.maxLiveRooms || this.overMemory()) {
+      return { code: "server-full", message: "Too many rooms are open right now: try again in a minute." };
+    }
     const data = await this.store.load(id);
     if (data === null) {
-      if (this.store.stored + this.unsavedLive() >= this.limits.maxRooms) {
+      if (
+        this.store.stored + this.unsavedLive() >= this.limits.maxRooms ||
+        this.store.bytes >= this.limits.maxStorageBytes
+      ) {
         return { code: "server-full", message: "No new rooms can be created right now." };
       }
       const now = Date.now();
@@ -351,8 +399,13 @@ export class RoomManager {
       if (recent.length >= this.limits.newRoomsPerHour) {
         return { code: "too-many-new-rooms", message: "Too many new rooms from your address: try later." };
       }
+      this.createdTotal = this.createdTotal.filter((t) => now - t < 3600_000);
+      if (this.createdTotal.length >= this.limits.newRoomsPerHourTotal) {
+        return { code: "too-many-new-rooms", message: "Too many new rooms right now: try later." };
+      }
       recent.push(now);
       this.created.set(ip, recent);
+      this.createdTotal.push(now);
     } else {
       await this.store.touch(id);
     }
@@ -388,6 +441,8 @@ export class RoomManager {
     if (room.peers > 0 || this.rooms.get(room.id) !== room) return;
     await room.save();
     if (room.peers > 0) return;
+    // the idle TTL counts from the moment the last person left
+    if (room.saved) await this.store.touch(room.id);
     this.rooms.delete(room.id);
     room.destroy();
     log("debug", "room unloaded", { room: roomTag(room.id) });

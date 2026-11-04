@@ -2,7 +2,7 @@
 
 import { assert, assertEquals, assertFalse } from "@std/assert";
 import { clientIp, inCidr, originAllowed } from "../src/server/net.ts";
-import { ENV_VARS, loadConfig } from "../src/server/config.ts";
+import { ENV_VARS, LIBRARY_ENV_VARS, loadConfig } from "../src/server/config.ts";
 import { isRoomId, newRoomId } from "../src/shared/protocol.ts";
 import { defaults, sanitize } from "../src/client/settings.ts";
 import { fuzzyScore } from "../src/client/ui/palette.ts";
@@ -41,19 +41,21 @@ Deno.test("config: defaults are the box values, bad numbers fall back, env list 
   assertEquals(c.dataDir, "/data");
   assertEquals(c.baseUrl, "https://code.hosh.it");
   assertEquals(c.trustedProxies, ["127.0.0.0/8", "::1/128", "172.16.0.0/12"]);
-  assertEquals(c.limits.maxDocBytes, 1024 * 1024);
+  assertEquals(c.limits.maxDocBytes, 640 * 1024);
+  assertEquals(c.limits.maxFileChars, 128 * 1024);
+  assertEquals(c.limits.roomTtlDays, 7);
   const env: Record<string, string> = {
     LIVECODE_MAX_DOC_KB: "-5",
     LIVECODE_MAX_PEERS_PER_ROOM: "abc",
     APP_BASE_URL: "https://x.test/",
   };
   const d = loadConfig((k) => env[k]);
-  assertEquals(d.limits.maxDocBytes, 1024 * 1024);
+  assertEquals(d.limits.maxDocBytes, 640 * 1024);
   assertEquals(d.limits.maxPeersPerRoom, 32);
   assertEquals(d.baseUrl, "https://x.test");
   const deno = JSON.parse(await Deno.readTextFile(new URL("../deno.json", import.meta.url)));
   const allow = (deno.tasks.compile as string).match(/--allow-env=(\S+)/)![1].split(",");
-  assertEquals([...allow].sort(), [...ENV_VARS].sort());
+  assertEquals([...allow].sort(), [...ENV_VARS, ...LIBRARY_ENV_VARS].sort());
 });
 
 Deno.test("protocol: room ids", () => {

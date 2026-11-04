@@ -60,12 +60,18 @@ All optional; `.env.example` holds the box values. Nobody needs to edit the file
 | `APP_BASE_URL` | `https://code.hosh.it` | public origin; browsers may open room WebSockets only from it |
 | `APP_TRUSTED_PROXIES` | `127.0.0.0/8,::1/128,172.16.0.0/12` | X-Forwarded-For trusted only from these peers |
 | `APP_LOG_LEVEL` | `info` | `debug` logs every request (room ids never logged, only a hash tag) |
-| `LIVECODE_MAX_ROOMS` | `5000` | rooms on disk; new rooms refused beyond it (existing keep working) |
-| `LIVECODE_MAX_DOC_KB` | `1024` | size of one room; edits beyond are refused with a notice |
+| `LIVECODE_ROOM_TTL_DAYS` | `7` | a room idle this long (nobody opened, edited or left it) is deleted; smoke rooms after 1 h |
+| `LIVECODE_MAX_FILE_KB` | `128` | characters per file: the editor refuses more, the server cuts back beyond it |
+| `LIVECODE_MAX_DOC_KB` | `640` | encoded size of one room (3 files + edit history); edits beyond are refused |
+| `LIVECODE_MAX_ROOMS` / `_STORAGE_MB` | `2000` / `512` | rooms / bytes on disk; new rooms refused beyond (existing keep working) |
+| `LIVECODE_MAX_LIVE_ROOMS` | `100` | rooms in memory at once |
+| `LIVECODE_MAX_RSS_MB` | `384` | process memory guard (container 512 MiB): new rooms/connections wait above it |
 | `LIVECODE_MAX_PEERS_PER_ROOM` | `32` | people in one room |
 | `LIVECODE_MAX_CONNS` / `_PER_IP` | `500` / `24` | WebSockets in total / per client address |
-| `LIVECODE_NEW_ROOMS_PER_HOUR` | `30` | rooms one address may create per hour |
-| `LIVECODE_ROOM_TTL_DAYS` | `90` | a room nobody opened for this long is deleted (smoke rooms: 1 h) |
+| `LIVECODE_NEW_ROOMS_PER_HOUR` / `_TOTAL` | `20` / `200` | rooms one address / everyone together may create per hour |
+
+Worst case on disk: 512 MB (inside the 7-day TTL); in memory: bounded by the RSS guard. Per message: 512 KiB,
+100 msg/s per connection (burst 300).
 
 ## 3. Capability checks (what "works" means — not just a 200)
 `POST_DEPLOY` = `/app/livecode smoke http://127.0.0.1:8000` runs 1–6 inside the container after every deploy
@@ -104,7 +110,8 @@ other's preview; Settings → Theme / Keymap / a shortcut change takes effect at
 - **Deno single binary** (bastonks pattern): `deno compile` with permissions compiled in
   (`--allow-net=0.0.0.0:8000,127.0.0.1:8000 --allow-read=/data --allow-write=/data --allow-env=<list>`).
 - **No auth by design** (owner, 2026-11-04): room links are capabilities (60-bit random ids). A typed room
-  name is guessable: say so to users who pick one. Abuse is bounded by the limits in §2.
+  name is guessable: say so to users who pick one. Abuse is bounded by the limits in §2 (owner, same day:
+  7-day idle TTL, a comfortable per-file cap, no way to flood rooms).
 - **The preview is user code.** It runs in a sandboxed iframe with an opaque origin and its own CSP: it may
   load external resources and `fetch` (useful for live coding), but can't read the app, submit forms,
   open popups or navigate the top window. It is shown only inside the editor, never as a standalone page.

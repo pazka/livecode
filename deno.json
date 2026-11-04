@@ -65,7 +65,7 @@
     "check": "deno fmt --check && deno lint && deno check src/ tests/ scripts/ e2e/",
     "test": "deno test --allow-read --allow-write --allow-net=127.0.0.1 --allow-env tests/",
     "dev": "deno run --allow-net=127.0.0.1 --allow-read --allow-write=./data --allow-env src/server/main.ts serve",
-    "compile": "deno compile --no-prompt --exclude-unused-npm --allow-net=0.0.0.0:8000,127.0.0.1:8000 --allow-read=/data --allow-write=/data --allow-env=APP_DATA_DIR,APP_PORT,APP_LOG_LEVEL,APP_BASE_URL,APP_TRUSTED_PROXIES,LIVECODE_MAX_ROOMS,LIVECODE_MAX_DOC_KB,LIVECODE_MAX_PEERS_PER_ROOM,LIVECODE_MAX_CONNS,LIVECODE_MAX_CONNS_PER_IP,LIVECODE_NEW_ROOMS_PER_HOUR,LIVECODE_ROOM_TTL_DAYS,LIVECODE_VERSION --output=dist/livecode src/server/main.ts",
+    "compile": "deno compile --no-prompt --exclude-unused-npm --allow-net=0.0.0.0:8000,127.0.0.1:8000 --allow-read=/data --allow-write=/data --allow-env=APP_DATA_DIR,APP_PORT,APP_LOG_LEVEL,APP_BASE_URL,APP_TRUSTED_PROXIES,LIVECODE_MAX_ROOMS,LIVECODE_MAX_STORAGE_MB,LIVECODE_MAX_LIVE_ROOMS,LIVECODE_MAX_RSS_MB,LIVECODE_MAX_FILE_KB,LIVECODE_MAX_DOC_KB,LIVECODE_MAX_PEERS_PER_ROOM,LIVECODE_MAX_CONNS,LIVECODE_MAX_CONNS_PER_IP,LIVECODE_NEW_ROOMS_PER_HOUR,LIVECODE_NEW_ROOMS_PER_HOUR_TOTAL,LIVECODE_ROOM_TTL_DAYS,LIVECODE_VERSION,PRODUCTION,NO_COLOR,FORCE_COLOR,COLORTERM,TERM,LOG,NODE_ENV --output=dist/livecode src/server/main.ts",
     "e2e": "deno test --allow-all e2e/"
   }
 }

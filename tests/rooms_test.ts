@@ -263,7 +263,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "store: gc deletes expired rooms (smoke rooms after an hour), keeps live ones",
+  name: "store: gc deletes rooms idle 7 days (smoke rooms after an hour), keeps live ones",
   ...opts,
   async fn() {
     const srv = await startServer();
@@ -272,18 +272,89 @@ Deno.test({
       await srv.store.save("smoke-abc123", new Uint8Array([0, 0]));
       await srv.store.save("live-room", new Uint8Array([0, 0]));
       await srv.store.save("new-room", new Uint8Array([0, 0]));
-      const past = new Date(Date.now() - 91 * 86400_000);
+      const past = new Date(Date.now() - 8 * 86400_000);
       await Deno.utime(`${srv.dataDir}/rooms/old-room.ydoc`, past, past);
       await Deno.utime(`${srv.dataDir}/rooms/live-room.ydoc`, past, past);
       const hourAgo = new Date(Date.now() - 2 * 3600_000);
       await Deno.utime(`${srv.dataDir}/rooms/smoke-abc123.ydoc`, hourAgo, hourAgo);
-      const n = await srv.store.gc(90, (id) => id === "live-room");
+      const n = await srv.store.gc(7, (id) => id === "live-room");
       assertEquals(n, 2);
       assertEquals(await srv.store.exists("old-room"), false);
       assertEquals(await srv.store.exists("smoke-abc123"), false);
       assertEquals(await srv.store.exists("live-room"), true);
       assertEquals(await srv.store.exists("new-room"), true);
       assertEquals(srv.store.stored, 2);
+    } finally {
+      await srv.stop();
+    }
+  },
+});
+
+Deno.test({
+  name: "limits: a file over the per-file limit is cut back for everyone",
+  ...opts,
+  async fn() {
+    const srv = await startServer({ limits: { maxFileChars: 2000 } });
+    const a = new YClient(`${srv.ws}/ws/file-limit`);
+    const b = new YClient(`${srv.ws}/ws/file-limit`);
+    try {
+      await Promise.all([a.ready(), b.ready()]);
+      a.doc.getText("css").insert(0, "y".repeat(5000));
+      await until(() => a.notices.some((n) => n.code === "file-too-large"), 3000, "notice");
+      await until(() => a.text("css").length === 2000 && b.text("css").length === 2000, 3000, "trimmed");
+      assertEquals(a.text("css"), b.text("css"));
+    } finally {
+      await a.close();
+      await b.close();
+      await srv.stop();
+    }
+  },
+});
+
+Deno.test({
+  name: "limits: new rooms per hour for everyone together (address rotation does not help)",
+  ...opts,
+  async fn() {
+    const srv = await startServer({ limits: { newRoomsPerHourTotal: 2, newRoomsPerHour: 100 } });
+    const a = new YClient(`${srv.ws}/ws/total-one`);
+    const b = new YClient(`${srv.ws}/ws/total-two`);
+    await Promise.all([a.ready(), b.ready()]);
+    const c = new YClient(`${srv.ws}/ws/total-three`);
+    try {
+      await c.closed;
+      assertEquals(c.notices[0]?.code, "too-many-new-rooms");
+    } finally {
+      await a.close();
+      await b.close();
+      await c.close();
+      await srv.stop();
+    }
+  },
+});
+
+Deno.test({
+  name: "limits: storage budget and rooms in memory",
+  ...opts,
+  async fn() {
+    const srv = await startServer({ limits: { maxStorageBytes: 100, maxLiveRooms: 1 } });
+    try {
+      await srv.store.save("already-here", new Uint8Array(150));
+      assertEquals(srv.store.bytes, 150);
+      // over the storage budget: an existing room opens, a new one is refused
+      const old = new YClient(`${srv.ws}/ws/already-here`);
+      await old.ready();
+      // one room in memory already: another (even stored) one must wait
+      await srv.store.save("also-here", new Uint8Array(10));
+      const other = new YClient(`${srv.ws}/ws/also-here`);
+      await other.closed;
+      assertEquals(other.notices[0]?.code, "server-full");
+      await old.close();
+      await until(() => srv.rooms.stats().live === 0, 3000, "unloaded");
+      const fresh = new YClient(`${srv.ws}/ws/brand-new`);
+      await fresh.closed;
+      assertEquals(fresh.notices[0]?.code, "server-full");
+      await other.close();
+      await fresh.close();
     } finally {
       await srv.stop();
     }

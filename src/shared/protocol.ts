@@ -29,8 +29,15 @@ export function newRoomId(): string {
   return s;
 }
 
+/**
+ * Default per-file limit (characters). The server enforces its own value (LIVECODE_MAX_FILE_KB, default the
+ * same) by trimming; the editor refuses input beyond this one so honest users never get trimmed.
+ */
+export const MAX_FILE_CHARS = 128 * 1024;
+
 export type NoticeCode =
   | "doc-too-large" // the room reached its size limit: further edits are refused
+  | "file-too-large" // one file went over the per-file limit: the server cut it back
   | "room-full" // too many people in this room
   | "server-full" // too many connections or rooms on the server
   | "rate-limited" // too many messages: the connection is closed, the client reconnects

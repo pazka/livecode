@@ -135,15 +135,30 @@ function startRoom(roomId: string) {
     const b = $("banner");
     b.hidden = false;
     b.textContent = n.message;
-    if (n.code === "rate-limited") setTimeout(() => (b.hidden = true), 4000);
+    if (n.code === "rate-limited" || n.code === "file-too-large") {
+      const shown = n.message;
+      setTimeout(() => {
+        if (b.textContent === shown) b.hidden = true;
+      }, 5000);
+    }
   }
 
   // --- editors + tabs ---
   let current: FileId = "html";
   const editors = Object.fromEntries(FILES.map((f) => [
     f,
-    new SharedEditor(f, $(`panel-${f}`), texts[f], awareness, editorOptions(settings.get())),
+    new SharedEditor(f, $(`panel-${f}`), texts[f], awareness, editorOptions(settings.get()), onFileLimit),
   ])) as Record<FileId, SharedEditor>;
+
+  let limitNoticeAt = 0;
+  function onFileLimit(f: FileId) {
+    if (Date.now() - limitNoticeAt < 3000) return;
+    limitNoticeAt = Date.now();
+    showNotice({
+      code: "file-too-large",
+      message: `${FILE_LABELS[f]} is at its size limit (${MAX_FILE_CHARS / 1024} K characters): that edit was not applied.`,
+    });
+  }
 
   function editorOptions(s: Settings) {
     return { keymap: s.keymap, tabSize: s.tabSize, lineWrap: s.lineWrap };

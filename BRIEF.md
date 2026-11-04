@@ -9,8 +9,11 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
 ## Users and access
 - Anyone with a room link can join and edit (owner choice). `/new` makes a random 12-character room;
   people can also type a room name (`/r/my-room`). No accounts, no passwords.
-- Limits instead of auth: room size (1 MiB), people per room (32), connections per address (24) and in total
-  (500), new rooms per address (30/h), message size and rate; rooms unopened for 90 days are deleted.
+- Limits instead of auth (owner: "TTL of 7 days … a safe but comfortable limit to the text content … so we
+  can't crash the server or create tons of rooms"): rooms idle for **7 days** are deleted; **128 K characters
+  per file** (≈ 3 000 lines; the editor refuses more, the server cuts back); 640 KiB per room; 32 people per
+  room; 20 new rooms/h per address and 200/h in total; 2 000 rooms / 512 MB on disk; 100 rooms in memory and
+  a memory guard; connections per address (24) and in total (500); message size and rate limits.
 
 ## Features
 1. **Three shared files** — HTML, CSS, JavaScript — edited together (Yjs CRDT: no lost edits, offline edits

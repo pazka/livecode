@@ -80,6 +80,7 @@ jobs:
             --security-opt no-new-privileges:true --pids-limit 128 --memory 512m \
             -e APP_BASE_URL=https://code.hosh.it -v smoke-data:/data -p 127.0.0.1:8000:8000 livecode:scan
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8000/healthz >/dev/null || { docker logs smoke; exit 1; }
           curl -fsS http://127.0.0.1:8000/healthz | python3 -c 'import json,sys; h=json.load(sys.stdin); assert h["status"]=="ok" and h["storage"]=="writable", h'
           docker exec smoke /app/livecode healthcheck
           docker exec smoke /app/livecode smoke http://127.0.0.1:8000

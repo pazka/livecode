@@ -33,7 +33,7 @@ import { emacs } from "@replit/codemirror-emacs";
 import { yCollab, ySyncAnnotation } from "y-codemirror.next";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
-import type { FileId } from "../shared/protocol.ts";
+import { type FileId, MAX_FILE_CHARS } from "../shared/protocol.ts";
 import { fallbackKeymap, PRESET_BY_ID, type PresetId } from "./keymaps.ts";
 import { editorTheme, highlightStyle } from "./themes.ts";
 
@@ -46,6 +46,21 @@ const language = (f: FileId): Extension =>
 const remoteNotInHistory = EditorState.transactionExtender.of((tr) =>
   tr.annotation(ySyncAnnotation) !== undefined ? { annotations: Transaction.addToHistory.of(false) } : null
 );
+
+/**
+ * Per-file limit: a local edit that would grow the file past MAX_FILE_CHARS is refused (deleting is always
+ * fine, remote edits pass). The server enforces the same limit by cutting files back.
+ */
+function fileLimit(onRefused: () => void) {
+  return EditorState.transactionFilter.of((tr) => {
+    if (!tr.docChanged || tr.annotation(ySyncAnnotation) !== undefined) return tr;
+    if (tr.newDoc.length > MAX_FILE_CHARS && tr.newDoc.length > tr.startState.doc.length) {
+      onRefused();
+      return [];
+    }
+    return tr;
+  });
+}
 
 export interface EditorOptions {
   keymap: PresetId;
@@ -65,6 +80,7 @@ export class SharedEditor {
     ytext: Y.Text,
     awareness: Awareness,
     opts: EditorOptions,
+    onLimit: (file: FileId) => void = () => {},
   ) {
     const state = EditorState.create({
       doc: ytext.toString(),
@@ -94,6 +110,7 @@ export class SharedEditor {
         this.wrap.of(opts.lineWrap ? EditorView.lineWrapping : []),
         yCollab(ytext, awareness, { undoManager: false }),
         remoteNotInHistory,
+        fileLimit(() => onLimit(file)),
         editorTheme,
         EditorView.contentAttributes.of({
           "aria-label": `${FILE_LABELS[file]} code, shared with the room`,

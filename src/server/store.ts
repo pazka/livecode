@@ -6,6 +6,7 @@ import { isRoomId } from "../shared/protocol.ts";
 export class Store {
   readonly roomsDir: string;
   private count = 0;
+  private total = 0;
 
   constructor(readonly dataDir: string) {
     this.roomsDir = `${dataDir}/rooms`;
@@ -14,8 +15,12 @@ export class Store {
   async init(): Promise<void> {
     await Deno.mkdir(this.roomsDir, { recursive: true });
     this.count = 0;
+    this.total = 0;
     for await (const e of Deno.readDir(this.roomsDir)) {
-      if (e.isFile && e.name.endsWith(".ydoc")) this.count++;
+      if (e.isFile && e.name.endsWith(".ydoc")) {
+        this.count++;
+        this.total += (await Deno.stat(`${this.roomsDir}/${e.name}`).catch(() => null))?.size ?? 0;
+      }
       // a crash between write and rename leaves a temp file: drop it
       if (e.isFile && e.name.endsWith(".tmp")) {
         await Deno.remove(`${this.roomsDir}/${e.name}`).catch(() => {});
@@ -26,6 +31,15 @@ export class Store {
   /** Rooms stored on disk (kept up to date by save/remove/gc). */
   get stored(): number {
     return this.count;
+  }
+
+  /** Bytes of all stored rooms. */
+  get bytes(): number {
+    return this.total;
+  }
+
+  private async sizeOf(id: string): Promise<number | null> {
+    return (await Deno.stat(this.path(id)).catch(() => null))?.size ?? null;
   }
 
   private path(id: string): string {
@@ -53,11 +67,12 @@ export class Store {
 
   async save(id: string, state: Uint8Array): Promise<void> {
     const p = this.path(id);
-    const existed = await this.exists(id);
+    const before = await this.sizeOf(id);
     const tmp = `${p}.${crypto.randomUUID().slice(0, 8)}.tmp`;
     await Deno.writeFile(tmp, state, { mode: 0o600 });
     await Deno.rename(tmp, p);
-    if (!existed) this.count++;
+    if (before === null) this.count++;
+    this.total = Math.max(0, this.total - (before ?? 0) + state.length);
   }
 
   /** Refresh the mtime of a room someone opened (the TTL counts from the last visit, not the last edit). */
@@ -68,8 +83,10 @@ export class Store {
 
   async remove(id: string): Promise<void> {
     try {
+      const size = (await this.sizeOf(id)) ?? 0;
       await Deno.remove(this.path(id));
       this.count = Math.max(0, this.count - 1);
+      this.total = Math.max(0, this.total - size);
     } catch (e) {
       if (!(e instanceof Deno.errors.NotFound)) throw e;
     }
@@ -82,20 +99,25 @@ export class Store {
   async gc(ttlDays: number, keep: (id: string) => boolean, now = Date.now()): Promise<number> {
     let n = 0;
     let seen = 0;
+    let bytes = 0;
     for await (const e of Deno.readDir(this.roomsDir)) {
       if (!e.isFile || !e.name.endsWith(".ydoc")) continue;
-      seen++;
       const id = e.name.slice(0, -5);
-      if (!isRoomId(id) || keep(id)) continue;
       const st = await Deno.stat(`${this.roomsDir}/${e.name}`).catch(() => null);
+      seen++;
+      bytes += st?.size ?? 0;
+      if (!isRoomId(id) || keep(id)) continue;
       const age = now - (st?.mtime?.getTime() ?? now);
       const ttl = id.startsWith("smoke-") ? 3600_000 : ttlDays * 86400_000;
       if (age > ttl) {
         await this.remove(id);
         n++;
+        bytes -= st?.size ?? 0;
       }
     }
-    this.count = seen - n; // recount: files removed behind our back (smoke cleanup) are forgotten here
+    // recount: files removed behind our back (smoke cleanup) are forgotten here
+    this.count = seen - n;
+    this.total = Math.max(0, bytes);
     return n;
   }
 
