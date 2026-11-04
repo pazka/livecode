@@ -70,7 +70,9 @@ async function expectTrue(p: Page, fn: string, what: string, timeout = 3000) {
 /** Clean slate: dialogs closed, search panel closed, the file's content, the tab shown, caret at the start. */
 async function reset(p: Page, f: F, content: string) {
   await p.bringToFront();
-  await p.evaluate(() => document.querySelectorAll("dialog[open]").forEach((d) => (d as HTMLDialogElement).close()));
+  await p.evaluate(() =>
+    document.querySelectorAll("dialog[open]").forEach((d) => (d as HTMLDialogElement).close())
+  );
   await p.click(`#tab-${f}`, { timeout: 5000 });
   const close = p.locator(`#panel-${f} .cm-search button[name=close]`);
   if (await close.count()) await close.first().click({ timeout: 5000 });
@@ -105,7 +107,7 @@ async function wordPoint(p: Page, f: F, word: string, at = 0.5): Promise<{ x: nu
  * Is my selection actually visible? CodeMirror draws it in a layer BEHIND the text; anything opaque between
  * that layer and the eye (a line background …) hides it. Hit-test the middle of every selection rectangle.
  */
-async function ownSelection(p: Page, f: F): Promise<{ rects: number; hidden: number }> {
+async function ownSelection(p: Page, f: F): Promise<{ rects: number; hidden: number; by: string }> {
   return await p.evaluate((f) => {
     const panel = document.getElementById(`panel-${f}`)!;
     const scroller = panel.querySelector(".cm-scroller")!;
@@ -117,21 +119,23 @@ async function ownSelection(p: Page, f: F): Promise<{ rects: number; hidden: num
       if (rgba) return parseFloat(rgba[1].split(",")[3]);
       return 1;
     };
-    let rects = 0, hidden = 0;
+    let rects = 0, hidden = 0, by = "";
     for (const el of panel.querySelectorAll(".cm-selectionBackground")) {
       const r = el.getBoundingClientRect();
       if (r.width < 3 || r.height < 3) continue;
       rects++;
       const stack = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       for (const e of stack) {
-        if (e === scroller || !scroller.contains(e)) break;
+        // reached the selection itself (or the editor below it) before anything opaque: visible
+        if (e === scroller || !scroller.contains(e) || e.closest(".cm-selectionLayer")) break;
         if (alpha(getComputedStyle(e).backgroundColor) > 0.5) {
           hidden++;
+          by = `${e.tagName.toLowerCase()}.${[...e.classList].join(".")} ${getComputedStyle(e).backgroundColor}`;
           break;
         }
       }
     }
-    return { rects, hidden };
+    return { rects, hidden, by };
   }, f);
 }
 
@@ -143,13 +147,17 @@ async function expectOwnSelectionVisible(p: Page, f: F) {
     s = await ownSelection(p, f);
   }
   if (s.rects === 0) throw new Error("no selection drawn at all");
-  if (s.hidden) throw new Error(`${s.hidden} of ${s.rects} selection rectangle(s) painted over (invisible)`);
+  if (s.hidden) {
+    throw new Error(`${s.hidden} of ${s.rects} selection rectangle(s) painted over (invisible) by ${s.by}`);
+  }
 }
 
 /** What B sees of A's selection (y-codemirror marks). */
 async function remoteSelectionText(p: Page, f: F): Promise<string> {
-  return await p.evaluate((f) =>
-    [...document.querySelectorAll(`#panel-${f} .cm-ySelection`)].map((e) => e.textContent).join(""), f);
+  return await p.evaluate(
+    (f) => [...document.querySelectorAll(`#panel-${f} .cm-ySelection`)].map((e) => e.textContent).join(""),
+    f,
+  );
 }
 
 async function expectRemoteSelection(p: Page, f: F, includes: string) {
@@ -159,12 +167,35 @@ async function expectRemoteSelection(p: Page, f: F, includes: string) {
     if (got.includes(includes)) return;
     await sleep(75);
   }
-  throw new Error(`peer sees selection ${JSON.stringify(got)}, want it to include ${JSON.stringify(includes)}`);
+  throw new Error(
+    `peer sees selection ${JSON.stringify(got)}, want it to include ${JSON.stringify(includes)}`,
+  );
+}
+
+/**
+ * Key trace for failure messages: every keydown as it leaves the page (window, bubble phase) — was it
+ * handled (defaultPrevented) by someone, or did it fall through to the browser?
+ */
+async function keyTrace(p: Page): Promise<string> {
+  return await p.evaluate(() => {
+    const w = globalThis as any;
+    if (!w.__keys) {
+      w.__keys = [];
+      addEventListener("keydown", (e) => {
+        const mods = `${e.ctrlKey ? "C-" : ""}${e.altKey ? "M-" : ""}${e.shiftKey ? "S-" : ""}`;
+        w.__keys.push(`${mods}${e.key}${e.defaultPrevented ? "✓" : "∅"}`);
+        if (w.__keys.length > 12) w.__keys.shift();
+      });
+    }
+    return w.__keys.join(" ");
+  });
 }
 
 const cursors = (p: Page, f: F) => p.locator(`#panel-${f} .cm-cursorLayer .cm-cursor`).count();
 
 async function setSettings(p: Page, patch: Record<string, unknown>) {
+  // the reload renders the preview once: leave no scratch JS for it to run
+  await p.evaluate(() => (globalThis as any).__livecode?.setText("js", ""));
   await p.evaluate((patch) => {
     const k = "livecode.settings.v1";
     const cur = JSON.parse(localStorage.getItem(k) ?? "{}");
@@ -210,12 +241,16 @@ Deno.test({
 
     const results: Result[] = [];
     const errors: string[] = [];
-    const check = async (name: string, fn: () => Promise<void>) => {
+    const check = async (name: string, fn: () => Promise<void> | void) => {
       try {
         await fn();
         results.push({ name, ok: true });
       } catch (e) {
-        results.push({ name, ok: false, detail: String((e as Error)?.message ?? e).split("\n")[0].slice(0, 300) });
+        results.push({
+          name,
+          ok: false,
+          detail: String((e as Error)?.message ?? e).split("\n")[0].slice(0, 300),
+        });
       }
     };
 
@@ -281,23 +316,28 @@ Deno.test({
         await a!.keyboard.press("Shift+End");
         await expectOwnSelectionVisible(a!, "html");
       });
-      await check("selection: Shift+ArrowDown over several lines — visible to me and to the peer", async () => {
-        await reset(a!, "html", PAGE);
-        await a!.keyboard.press("ArrowDown");
-        await a!.keyboard.press("Shift+ArrowDown");
-        await a!.keyboard.press("Shift+ArrowDown");
-        await a!.keyboard.press("Shift+End");
-        await shot(a!, "sel-03-me-lines");
-        await expectOwnSelectionVisible(a!, "html");
-        await expectRemoteSelection(b, "html", "Hello world");
-        await shot(b, "sel-04-peer-lines");
-      });
+      await check(
+        "selection: Shift+ArrowDown over several lines — visible to me and to the peer",
+        async () => {
+          await reset(a!, "html", PAGE);
+          await a!.keyboard.press("ArrowDown");
+          await a!.keyboard.press("Shift+ArrowDown");
+          await a!.keyboard.press("Shift+ArrowDown");
+          await a!.keyboard.press("Shift+End");
+          await shot(a!, "sel-03-me-lines");
+          await expectOwnSelectionVisible(a!, "html");
+          await expectRemoteSelection(b, "html", "Hello world");
+          await shot(b, "sel-04-peer-lines");
+        },
+      );
       await check("selection: Ctrl+A — visible to me", async () => {
         await reset(a!, "html", PAGE);
         await a!.keyboard.press("Control+KeyA");
         await expectOwnSelectionVisible(a!, "html");
       });
-      for (const theme of ["dark", "dim", "sepia", "solarized-light", "solarized-dark", "hc-dark", "hc-light"]) {
+      for (
+        const theme of ["dark", "dim", "sepia", "solarized-light", "solarized-dark", "hc-dark", "hc-light"]
+      ) {
         await check(`selection: visible to me on theme ${theme}`, async () => {
           await a!.evaluate((t) => (document.documentElement.dataset.theme = t), theme);
           await reset(a!, "html", PAGE);
@@ -427,27 +467,33 @@ Deno.test({
       }
 
       // ----- keys that must not be swallowed -----
-      await check("search field: Ctrl+A selects the field text (not the editor), typing replaces it", async () => {
-        await reset(a!, "html", PAGE);
-        const pt = await wordPoint(a!, "html", "beta");
-        await a!.mouse.dblclick(pt.x, pt.y);
-        await a!.keyboard.press("Control+KeyF");
-        await a!.waitForSelector("#panel-html .cm-search input[name=search]");
-        await a!.keyboard.press("Control+KeyA");
-        await a!.keyboard.type("gamma");
-        const v = await a!.inputValue("#panel-html .cm-search input[name=search]");
-        if (v !== "gamma") throw new Error(`search field is ${JSON.stringify(v)}, want "gamma"`);
-        await expectText(a!, "html", PAGE, "editor untouched");
-      });
+      await check(
+        "search field: Ctrl+A selects the field text (not the editor), typing replaces it",
+        async () => {
+          await reset(a!, "html", PAGE);
+          const pt = await wordPoint(a!, "html", "beta");
+          await a!.mouse.dblclick(pt.x, pt.y);
+          await a!.keyboard.press("Control+KeyF");
+          await a!.waitForSelector("#panel-html .cm-search input[name=search]");
+          await a!.keyboard.press("Control+KeyA");
+          await a!.keyboard.type("gamma");
+          const v = await a!.inputValue("#panel-html .cm-search input[name=search]");
+          if (v !== "gamma") throw new Error(`search field is ${JSON.stringify(v)}, want "gamma"`);
+          await expectText(a!, "html", PAGE, "editor untouched");
+        },
+      );
       await check("search field: Ctrl+Z / Backspace edit the field, the editor is untouched", async () => {
         await a!.keyboard.press("Backspace");
         await a!.keyboard.press("Control+KeyZ");
         await expectText(a!, "html", PAGE, "editor untouched");
       });
-      await check("search field: Escape closes the search panel (with a selection in the editor)", async () => {
-        await a!.keyboard.press("Escape");
-        await expectTrue(a!, `!document.querySelector("#panel-html .cm-search")`, "search panel closed");
-      });
+      await check(
+        "search field: Escape closes the search panel (with a selection in the editor)",
+        async () => {
+          await a!.keyboard.press("Escape");
+          await expectTrue(a!, `!document.querySelector("#panel-html .cm-search")`, "search panel closed");
+        },
+      );
       await check("completion: Escape closes the popup and keeps my 2 cursors", async () => {
         await reset(a!, "js", "foo\nfoo");
         await a!.keyboard.press("Control+KeyD");
@@ -481,21 +527,24 @@ Deno.test({
         }
         if (bad.length) throw new Error(`swallowed/changed: ${bad.join(" ")}`);
       });
-      await check("palette: typing in its field is not taken as shortcuts; Escape returns to the editor", async () => {
-        await reset(a!, "html", PAGE);
-        await a!.keyboard.press("F1");
-        await a!.waitForSelector("#palette[open]");
-        await a!.keyboard.type("dz[]1");
-        const v = await a!.inputValue("#palette-input");
-        if (v !== "dz[]1") throw new Error(`palette field is ${JSON.stringify(v)}`);
-        await a!.keyboard.press("Escape");
-        await expectTrue(a!, `!document.querySelector("#palette[open]")`, "palette closed");
-        await expectTrue(
-          a!,
-          `!!document.activeElement?.closest("#panel-html .cm-content")`,
-          "focus back in the editor",
-        );
-      });
+      await check(
+        "palette: typing in its field is not taken as shortcuts; Escape returns to the editor",
+        async () => {
+          await reset(a!, "html", PAGE);
+          await a!.keyboard.press("F1");
+          await a!.waitForSelector("#palette[open]");
+          await a!.keyboard.type("dz[]1");
+          const v = await a!.inputValue("#palette-input");
+          if (v !== "dz[]1") throw new Error(`palette field is ${JSON.stringify(v)}`);
+          await a!.keyboard.press("Escape");
+          await expectTrue(a!, `!document.querySelector("#palette[open]")`, "palette closed");
+          await expectTrue(
+            a!,
+            `!!document.activeElement?.closest("#panel-html .cm-content")`,
+            "focus back in the editor",
+          );
+        },
+      );
 
       // ----- word / line commands (VS Code) -----
       await check("words: Ctrl+→ jumps a word, Ctrl+Shift+→ selects one", async () => {
@@ -533,18 +582,36 @@ Deno.test({
       await check("app keys in the editor: Alt+2 / Alt+3 / Alt+1 switch files", async () => {
         await reset(a!, "html", PAGE);
         await a!.keyboard.press("Alt+Digit2");
-        await expectTrue(a!, `document.querySelector("#tab-css").getAttribute("aria-selected") === "true"`, "CSS");
+        await expectTrue(
+          a!,
+          `document.querySelector("#tab-css").getAttribute("aria-selected") === "true"`,
+          "CSS",
+        );
         await a!.keyboard.press("Alt+Digit3");
-        await expectTrue(a!, `document.querySelector("#tab-js").getAttribute("aria-selected") === "true"`, "JS");
+        await expectTrue(
+          a!,
+          `document.querySelector("#tab-js").getAttribute("aria-selected") === "true"`,
+          "JS",
+        );
         await a!.keyboard.press("Alt+Digit1");
-        await expectTrue(a!, `document.querySelector("#tab-html").getAttribute("aria-selected") === "true"`, "HTML");
+        await expectTrue(
+          a!,
+          `document.querySelector("#tab-html").getAttribute("aria-selected") === "true"`,
+          "HTML",
+        );
       });
       await check("app keys in the editor: Ctrl+Enter runs the preview", async () => {
         await hook(a!).setText("js", "");
         await reset(a!, "html", PAGE);
         const n = await a!.evaluate(() => (globalThis as any).__livecode.renders());
+        await keyTrace(a!);
         await a!.keyboard.press("Control+Enter");
-        await expectTrue(a!, `globalThis.__livecode.renders() > ${n}`, "a new render");
+        try {
+          await expectTrue(a!, `globalThis.__livecode.renders() > ${n}`, "a new render", 6000);
+        } catch (e) {
+          const now = await a!.evaluate(() => (globalThis as any).__livecode.renders());
+          throw new Error(`${(e as Error).message} (renders ${n} → ${now}; keys ${await keyTrace(a!)})`);
+        }
         await expectText(a!, "html", PAGE, "no newline typed");
       });
 
@@ -624,13 +691,19 @@ Deno.test({
       await check("Emacs: Ctrl+E / Ctrl+A move to line end / start (Ctrl+A is not select-all)", async () => {
         await reset(a!, "html", "alpha beta\ngamma");
         const mode = await a!.evaluate(() => !!document.querySelector("#panel-html .cm-emacsMode"));
+        await keyTrace(a!);
         await a!.keyboard.press("Control+KeyE");
         await a!.keyboard.type("!");
         const afterE = await hook(a!).text("html");
         await a!.keyboard.press("Control+KeyA");
         await a!.keyboard.type("^");
         await shot(a!, "emacs-01");
-        await expectText(a!, "html", "^alpha beta!\ngamma", `emacs mode on: ${mode}, after C-e "!": ${JSON.stringify(afterE)}`);
+        await expectText(
+          a!,
+          "html",
+          "^alpha beta!\ngamma",
+          `emacs mode on: ${mode}, after C-e "!": ${JSON.stringify(afterE)}, keys ${await keyTrace(a!)}`,
+        );
       });
       await check("Emacs: Ctrl+Space mark + Ctrl+F selects visibly; Ctrl+W kills, Ctrl+Y yanks", async () => {
         await reset(a!, "html", "alpha beta");
@@ -649,9 +722,9 @@ Deno.test({
         await a!.keyboard.press("Escape");
       });
 
-      await check("no page errors in either browser", async () => {
-        const real = errors.filter((e) => !e.includes("favicon"));
-        if (real.length) throw new Error(real.slice(0, 5).join(" | "));
+      await check("no page errors in either browser", () => {
+        const real = [...new Set(errors.filter((e) => !e.includes("favicon")))];
+        if (real.length) throw new Error(real.slice(0, 12).join(" | "));
       });
     } finally {
       try {
@@ -675,6 +748,8 @@ Deno.test({
       await Deno.writeTextFile(REPORT, lines.join("\n") + "\n");
     }
     const failed = results.filter((r) => !r.ok);
-    if (failed.length) throw new Error(`${failed.length} editing check(s) failed:\n${failed.map((r) => r.name).join("\n")}`);
+    if (failed.length) {
+      throw new Error(`${failed.length} editing check(s) failed:\n${failed.map((r) => r.name).join("\n")}`);
+    }
   },
 });

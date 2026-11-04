@@ -2,7 +2,7 @@
 // without a selection; only the selected lines with one. Runs CodeMirror's state, no browser.
 
 import { assertEquals } from "@std/assert";
-import { EditorSelection, EditorState, type Extension, type Transaction } from "@codemirror/state";
+import { EditorSelection, EditorState, type Extension, type TransactionSpec } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { indentUnit } from "@codemirror/language";
 import { html } from "@codemirror/lang-html";
@@ -16,7 +16,12 @@ function run(doc: string, lang: Extension, sel?: [number, number]): string {
     extensions: [lang, indentUnit.of("  "), EditorState.tabSize.of(2)],
     selection: sel ? EditorSelection.single(sel[0], sel[1]) : undefined,
   });
-  const view = { get state() { return state; }, dispatch: (tr: Transaction) => (state = tr.state) };
+  const view = {
+    get state() {
+      return state;
+    },
+    dispatch: (spec: TransactionSpec) => (state = state.update(spec).state),
+  };
   formatCode(view as unknown as EditorView);
   return state.doc.toString();
 }
@@ -29,7 +34,10 @@ Deno.test("format: JS whole file", () => {
 });
 
 Deno.test("format: CSS whole file", () => {
-  assertEquals(run("body {\ncolor: red;  \n    margin: 0;\n}", css()), "body {\n  color: red;\n  margin: 0;\n}");
+  assertEquals(
+    run("body {\ncolor: red;  \n    margin: 0;\n}", css()),
+    "body {\n  color: red;\n  margin: 0;\n}",
+  );
 });
 
 Deno.test("format: HTML whole file, blank lines emptied", () => {

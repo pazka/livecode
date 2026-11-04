@@ -45,7 +45,7 @@ const language = (f: FileId): Extension =>
 /** `cm-hasSelection` on the editor while any range is non-empty (themes.ts: the caret line steps aside). */
 const selectionClass = EditorView.editorAttributes.compute(
   ["selection"],
-  (s) => (s.selection.ranges.some((r) => !r.empty) ? { class: "cm-hasSelection" } : {}),
+  (s): Record<string, string> => (s.selection.ranges.some((r) => !r.empty) ? { class: "cm-hasSelection" } : {}),
 );
 
 /** Remote edits (y-codemirror's sync annotation) never enter the local undo history. */

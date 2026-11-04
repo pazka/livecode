@@ -138,7 +138,9 @@ export function eventStrokes(e: KeyEventLike): string[] {
   // the layout's own letters win: AZERTY Ctrl+Q is Ctrl-q, never the physical key's Ctrl-a. The physical
   // key is only a fallback when a modifier changed the character (macOS ⌥1 = "¡", AZERTY digits, Cyrillic)
   const layoutLetter = /^[a-z]$/i.test(e.key);
-  if (base && !layoutLetter && (isChar || e.key === " ") && (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey)) {
+  if (
+    base && !layoutLetter && (isChar || e.key === " ") && (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey)
+  ) {
     const b = withMods(base, e, true);
     if (!out.includes(b)) out.push(b);
   }
