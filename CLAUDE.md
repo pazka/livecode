@@ -49,3 +49,12 @@ an app that follows it deploys first try. Values already fixed for this project:
 - `livecode.env`: you may create it from `.env.example` BEFORE any secret is in it; after the owner
   has filled it, **never print, cat, grep, copy or edit it**. If a variable is wrong, name it to the
   owner and stop. Never run owner-only interactive scripts; never delete the `livecode-data` volume.
+
+## Project notes (livecode)
+- Stack and approved deps: `BRIEF.md` § Stack. **No new third-party dependency without the owner's yes**
+  (Decision #17); pins are exact in `deno.json`, `deno.lock` is frozen.
+- No local Deno needed: Actions → **bootstrap** regenerates `deno.lock`, produces a `deno fmt` patch and a
+  full report (build, lint, check, tests, e2e) as artifacts.
+- Pure modules have unit tests (`tests/`): keys/keymaps (every preset conflict-free on PC and Mac),
+  loop guard, preview composition, themes (WCAG contrast of every theme). Server: real-socket integration
+  tests. `e2e/` drives two Chromium windows in one room.

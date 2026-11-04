@@ -7,3 +7,5 @@ data/
 *.db
 __pycache__/
 node_modules/
+dist/
+src/server/assets.gen.ts

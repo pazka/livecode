@@ -1,3 +1,47 @@
 # livecode — brief
 
-TODO (owner): what the site does, users, features, constraints.
+**https://code.hosh.it** — owner: Alexandre (pazka). Request (2026-11-04): *"a new project where users can live
+code an html / css / js webpage together, where we can see the cursor of each other and the webpage is
+refreshed live (with rebound protection of course). The theme must be choosable for each user, several
+available from light to dark to high contrast etc. Accessible to keyboard too, usable keymaps for users (vim,
+jetbrains, vscode, etc.) and keymaps customisable quickly."*
+
+## Users and access
+- Anyone with a room link can join and edit (owner choice). `/new` makes a random 12-character room;
+  people can also type a room name (`/r/my-room`). No accounts, no passwords.
+- Limits instead of auth: room size (1 MiB), people per room (32), connections per address (24) and in total
+  (500), new rooms per address (30/h), message size and rate; rooms unopened for 90 days are deleted.
+
+## Features
+1. **Three shared files** — HTML, CSS, JavaScript — edited together (Yjs CRDT: no lost edits, offline edits
+   merge on reconnect). Remote **cursors and selections with names** in every file; a dot on each file tab
+   for who is where; the people list jumps to a person's cursor.
+2. **Live preview** refreshed for everyone after a debounce ("anti-rebond", default 600 ms after the last
+   keystroke, per person 100–5000 ms); Run (Ctrl/Cmd+Enter or Ctrl/Cmd+S) forces it; auto-refresh can be
+   turned off. No flash: the new version swaps in once it is alive. Console output and errors of the page
+   appear in a console panel.
+3. **Safety of the preview**: sandboxed iframe without `allow-same-origin` (opaque origin: no access to the
+   app, its storage or other rooms), its own CSP (no form posts, can't be framed elsewhere), loop guard
+   (any for/while/do loop running 1.5 s without yielding is stopped), and if a preview ever freezes the tab,
+   the next load starts with the preview paused (`?norun` does the same by hand).
+4. **Themes per person**: Light, Dark, Dim, Sepia, Solarized light/dark, High contrast dark/light, and
+   "System" (follows dark mode, `prefers-contrast` and Windows forced colours). Every theme meets WCAG
+   contrast (text ≥ 4.5:1, ≥ 7:1 for high contrast; focus, borders ≥ 3:1) — enforced by a test.
+5. **Keymaps per person**: VS Code (default), JetBrains, Sublime Text, Vim (with `:w` = run, `:e css`,
+   user `imap/nmap/noremap` lines), Emacs. **Every shortcut is customisable fast**: Settings → Keyboard
+   → Change → press the keys (chords like Ctrl+K Ctrl+S work), Add, Clear, Reset, conflicts shown,
+   export/import as JSON. A command palette (F1 / Ctrl+Shift+P, or the preset's own key) runs anything,
+   including "theme …" and "keymap …".
+6. **Keyboard and screen readers**: skip link, landmarks, tabs with arrow keys, resizable split by keyboard,
+   F6 cycles toolbar → editor → preview → console, Escape then Tab leaves the editor (or toggle "Tab moves
+   focus"), joins/leaves and status announced politely, `aria-keyshortcuts` on buttons, reduced motion.
+7. Per-person settings stay in the browser (localStorage); only name + colour are shared.
+
+## Stack (Decision #17 deps approved by the owner, 2026-11-04)
+Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,
+y-codemirror.next, @replit/codemirror-vim, @replit/codemirror-emacs; CI-only: @std/assert, playwright-core.
+No other runtime dependency; no outbound calls from the server.
+
+## Not in v0.1 (ideas for the owner)
+Room history / snapshots, read-only share links, owner passphrase for room creation, room templates,
+external library picker, mouse pointers over the preview.

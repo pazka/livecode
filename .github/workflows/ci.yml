@@ -2,9 +2,10 @@ name: ci
 
 # push to main / PR → tests → build → Trivy CRITICAL gate → hardened container smoke → (main only)
 # push ghcr.io/pazka/livecode:ci and :<sha>. Box standard (hosh-migration 11-BOX-STANDARD.md).
+# agent/** branches get the same checks without a PR (nothing is pushed to ghcr for them).
 on:
   push:
-    branches: [main]
+    branches: [main, 'agent/**']
   pull_request:
   workflow_dispatch:
 
@@ -21,12 +22,23 @@ env:
   TRIVY_IMAGE: mirror.gcr.io/aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
 
 jobs:
-  test:   # adapt to the stack (pytest / npm test / go test …); keep it blocking
+  test:   # fmt, lint, typecheck, unit + integration tests, then the two-browser e2e
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - run: |
-          echo "TODO (builder): run the test suite" && false
+      - uses: actions/checkout@v7
+      - name: Install Deno 2.9.8 (pinned, checksum-verified)
+        run: |
+          set -euo pipefail
+          url=https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-unknown-linux-gnu.zip
+          curl -fsSL -o /tmp/deno.zip "$url"
+          echo "e890975bc2549807bbcc0b584ffafda72cc7c93349dd99c80483dd784f6c4609  /tmp/deno.zip" | sha256sum -c -
+          sudo unzip -o -q /tmp/deno.zip -d /usr/local/bin && deno --version
+      - run: deno ci            # frozen lockfile, minimum dependency age, no install scripts
+      - run: deno task build    # front-end bundle embedded into the server
+      - run: deno task check
+      - run: deno task test
+      - name: e2e (headless Chrome, software GL)
+        run: CHROME_PATH="$(command -v google-chrome || command -v chromium)" deno task e2e
 
   image:
     needs: test
@@ -35,11 +47,18 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v7
+      - name: Install Deno 2.9.8 (pinned, checksum-verified)
+        run: |
+          set -euo pipefail
+          url=https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-unknown-linux-gnu.zip
+          curl -fsSL -o /tmp/deno.zip "$url"
+          echo "e890975bc2549807bbcc0b584ffafda72cc7c93349dd99c80483dd784f6c4609  /tmp/deno.zip" | sha256sum -c -
+          sudo unzip -o -q /tmp/deno.zip -d /usr/local/bin && deno --version
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build (local, for scanning)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
@@ -54,18 +73,44 @@ jobs:
             --db-repository mirror.gcr.io/aquasec/trivy-db,ghcr.io/aquasecurity/trivy-db \
             livecode:scan
 
-      - name: Container smoke (same hardening as the box)
+      - name: Container smoke (same hardening as the box) + capability checks
         run: |
+          set -euo pipefail
           docker run -d --name smoke --read-only --tmpfs /tmp --cap-drop ALL --user 10001:10001 \
-            --security-opt no-new-privileges:true -v smoke-data:/data -p 127.0.0.1:8000:8000 livecode:scan
+            --security-opt no-new-privileges:true --pids-limit 128 --memory 512m \
+            -e APP_BASE_URL=https://code.hosh.it -v smoke-data:/data -p 127.0.0.1:8000:8000 livecode:scan
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && break; sleep 2; done
-          curl -fsS http://127.0.0.1:8000/healthz | python3 -c 'import json,sys; assert json.load(sys.stdin)["status"]=="ok"'
+          curl -fsS http://127.0.0.1:8000/healthz | python3 -c 'import json,sys; h=json.load(sys.stdin); assert h["status"]=="ok" and h["storage"]=="writable", h'
+          docker exec smoke /app/livecode healthcheck
+          docker exec smoke /app/livecode smoke http://127.0.0.1:8000
+          # a browser from another site may not open a room socket
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+            -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+            -H 'Origin: https://evil.example' http://127.0.0.1:8000/ws/smoke-origin)
+          test "$code" = 403
+          docker stop -t 20 smoke   # SIGTERM: flushes rooms and exits cleanly
+          test "$(docker inspect --format '{{.State.ExitCode}}' smoke)" = 0
           docker logs smoke | tail -n 20
           docker rm -f smoke
 
+      - name: Hardening comes from the image; /data is writable under it
+        run: |
+          set -euo pipefail
+          # The image itself runs as 10001 (no --user here: a Dockerfile regression must show).
+          test "$(docker image inspect --format '{{.Config.User}}' livecode:scan)" = "10001:10001"
+          # Empty volume + read-only rootfs: the app must create its own state under /data and stay up.
+          docker run -d --name fresh --read-only --tmpfs /tmp --cap-drop ALL \
+            --security-opt no-new-privileges:true --pids-limit 128 --memory 512m \
+            -v fresh-data:/data livecode:scan
+          sleep 6
+          test "$(docker inspect --format '{{.State.Running}}' fresh)" = true
+          docker cp fresh:/data - | tar -t > /tmp/fresh.lst
+          grep -qx 'data/rooms/' /tmp/fresh.lst
+          docker rm -f fresh
+
       - name: Log in to GHCR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -73,7 +118,7 @@ jobs:
 
       - name: Push :ci and :<sha>
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true

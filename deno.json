@@ -1,0 +1,71 @@
+{
+  "version": "0.1.0",
+  "lock": {
+    "frozen": true
+  },
+  "minimumDependencyAge": "P7D",
+  "nodeModulesDir": "none",
+  "allowScripts": false,
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1.0.19",
+    "yjs": "npm:yjs@13.6.33",
+    "y-protocols/": "npm:/y-protocols@1.0.7/",
+    "lib0/": "npm:/lib0@0.2.119/",
+    "y-codemirror.next": "npm:y-codemirror.next@0.3.6",
+    "@codemirror/state": "npm:@codemirror/state@6.7.6",
+    "@codemirror/view": "npm:@codemirror/view@6.43.15",
+    "@codemirror/commands": "npm:@codemirror/commands@6.11.1",
+    "@codemirror/language": "npm:@codemirror/language@6.13.1",
+    "@codemirror/search": "npm:@codemirror/search@6.7.2",
+    "@codemirror/autocomplete": "npm:@codemirror/autocomplete@6.20.4",
+    "@codemirror/lang-html": "npm:@codemirror/lang-html@6.4.12",
+    "@codemirror/lang-css": "npm:@codemirror/lang-css@6.3.1",
+    "@codemirror/lang-javascript": "npm:@codemirror/lang-javascript@6.2.5",
+    "@lezer/highlight": "npm:@lezer/highlight@1.2.5",
+    "@replit/codemirror-vim": "npm:@replit/codemirror-vim@6.4.0",
+    "@replit/codemirror-emacs": "npm:@replit/codemirror-emacs@6.1.0",
+    "playwright-core": "npm:playwright-core@1.64.1"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "lib": [
+      "deno.ns",
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ]
+  },
+  "fmt": {
+    "lineWidth": 110,
+    "include": [
+      "src/",
+      "tests/",
+      "scripts/",
+      "e2e/"
+    ],
+    "exclude": [
+      "src/server/assets.gen.ts"
+    ]
+  },
+  "lint": {
+    "exclude": [
+      "web/",
+      "dist/",
+      "src/server/assets.gen.ts"
+    ]
+  },
+  "exclude": [
+    "dist/",
+    "data/"
+  ],
+  "tasks": {
+    "bundle": "mkdir -p dist/web && deno bundle --platform=browser --minify --output=dist/web/app.js src/client/main.ts",
+    "embed": "deno run --allow-read=dist,web --allow-write=dist/web/index.html,src/server/assets.gen.ts scripts/embed.ts",
+    "build": "deno task bundle && deno task embed",
+    "check": "deno fmt --check && deno lint && deno check src/ tests/ scripts/ e2e/",
+    "test": "deno test --allow-read --allow-write --allow-net=127.0.0.1 --allow-env tests/",
+    "dev": "deno run --allow-net=127.0.0.1 --allow-read --allow-write=./data --allow-env src/server/main.ts serve",
+    "compile": "deno compile --no-prompt --exclude-unused-npm --allow-net=0.0.0.0:8000,127.0.0.1:8000 --allow-read=/data --allow-write=/data --allow-env=APP_DATA_DIR,APP_PORT,APP_LOG_LEVEL,APP_BASE_URL,APP_TRUSTED_PROXIES,LIVECODE_MAX_ROOMS,LIVECODE_MAX_DOC_KB,LIVECODE_MAX_PEERS_PER_ROOM,LIVECODE_MAX_CONNS,LIVECODE_MAX_CONNS_PER_IP,LIVECODE_NEW_ROOMS_PER_HOUR,LIVECODE_ROOM_TTL_DAYS,LIVECODE_VERSION --output=dist/livecode src/server/main.ts",
+    "e2e": "deno test --allow-all e2e/"
+  }
+}

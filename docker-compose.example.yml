@@ -24,9 +24,10 @@ services:
     user: "10001:10001"
     pids_limit: 128
     mem_limit: 512m
+    stop_grace_period: 20s         # SIGTERM → unsaved room edits are flushed to /data
     healthcheck:
-      # adapt the command to the image (python / wget / node …); must hit GET /healthz
-      test: ["CMD", "python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status == 200 else 1)"]
+      # the binary checks GET /healthz itself (distroless: no shell, no curl)
+      test: ["CMD", "/app/livecode", "healthcheck"]
       interval: 30s
       timeout: 5s
       start_period: 20s

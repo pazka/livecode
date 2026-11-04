@@ -1,0 +1,53 @@
+name: bootstrap
+
+# Supply chain (box Decision #17): nothing of this app is installed, built or run on the hosh.it box or on a
+# developer machine — only here. This manual job resolves the pinned imports of deno.json into a lockfile
+# (minimum release age 7 days, no install scripts), formats the code, and reports every check without
+# failing fast. Its artifacts (deno.lock, fmt.patch, report.txt) are reviewed and committed by hand; after
+# that, ci.yml runs with the frozen lockfile.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Deno 2.9.8 (pinned, checksum-verified)
+        run: |
+          set -euo pipefail
+          url=https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-unknown-linux-gnu.zip
+          curl -fsSL -o /tmp/deno.zip "$url"
+          echo "e890975bc2549807bbcc0b584ffafda72cc7c93349dd99c80483dd784f6c4609  /tmp/deno.zip" | sha256sum -c -
+          sudo unzip -o -q /tmp/deno.zip -d /usr/local/bin && deno --version
+      - name: Resolve the lockfile (frozen off for this one step)
+        run: |
+          set -euo pipefail
+          if [ -f deno.lock ]; then cp deno.lock /tmp/deno.lock.before; fi
+          deno install --frozen=false
+          deno install --frozen=false --entrypoint src/server/main.ts src/client/main.ts tests/*.ts e2e/*.ts
+          cp deno.lock /tmp/deno.lock
+      - name: Format (produces fmt.patch)
+        run: |
+          deno fmt
+          git diff -- . ':(exclude)deno.lock' > /tmp/fmt.patch || true
+          wc -l /tmp/fmt.patch
+      - name: Report (every check, no fail-fast)
+        run: |
+          {
+            echo "== build";  deno task build 2>&1 || echo "BUILD FAILED"
+            echo "== lint";   deno lint 2>&1 || echo "LINT FAILED"
+            echo "== check";  deno check src/ tests/ scripts/ e2e/ 2>&1 || echo "CHECK FAILED"
+            echo "== test";   deno task test 2>&1 || echo "TEST FAILED"
+            echo "== e2e";    CHROME_PATH="$(command -v google-chrome || command -v chromium)" deno task e2e 2>&1 || echo "E2E FAILED"
+          } | tee /tmp/report.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bootstrap
+          path: |
+            /tmp/deno.lock
+            /tmp/fmt.patch
+            /tmp/report.txt

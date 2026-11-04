@@ -33,7 +33,7 @@ jobs:
       issues: write          # "needs-review" label
       actions: write         # re-run CI on the default branch
     steps:
-      - uses: actions/checkout@v5   # default branch: trusted code only
+      - uses: actions/checkout@v7   # default branch: trusted code only
         with:
           persist-credentials: false
           sparse-checkout: .github/scripts
