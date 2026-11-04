@@ -59,12 +59,15 @@ async function expectText(p: Page, f: F, want: string | ((s: string) => boolean)
   );
 }
 
-async function expectTrue(p: Page, fn: string, what: string, timeout = 3000) {
-  try {
-    await p.waitForFunction(fn, null, { timeout });
-  } catch {
-    throw new Error(`not true after ${timeout} ms: ${what}`);
-  }
+async function expectTrue(p: Page, expr: string, what: string, timeout = 3000) {
+  // polled from here, not with waitForFunction(string): that evals inside the page, which the app's CSP
+  // (no 'unsafe-eval') rightly refuses
+  const end = Date.now() + timeout;
+  do {
+    if (await p.evaluate(expr).catch(() => false)) return;
+    await sleep(75);
+  } while (Date.now() < end);
+  throw new Error(`not true after ${timeout} ms: ${what}`);
 }
 
 /** Clean slate: dialogs closed, search panel closed, the file's content, the tab shown, caret at the start. */
