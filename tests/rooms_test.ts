@@ -162,7 +162,7 @@ Deno.test({
     try {
       await c.closed;
       assertEquals(c.notices[0]?.code, "room-full");
-      assertEquals(srv.rooms.stats().connections, 2);
+      await until(() => srv.rooms.stats().connections === 2, 3000, "refused connection released");
     } finally {
       await a.close();
       await b.close();

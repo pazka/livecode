@@ -74,7 +74,7 @@ Deno.test({
       assertEquals(await previewText(a, "h1"), "Hello, live code!");
 
       // A edits; B's preview refreshes by itself (debounced)
-      await a.evaluate(() => (globalThis as any).__livecode.setText("html", '<h1 id="t">Hello from A</h1>'));
+      await a.evaluate(() => (globalThis as any).__livecode.setText("html", '<h1 id="t">Hello from A</h1><button id="btn">b</button><p id="out"></p>'));
       await b.waitForFunction(() => (globalThis as any).__livecode.text("html").includes("Hello from A"));
       await b.waitForFunction(
         () => {
