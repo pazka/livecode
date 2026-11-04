@@ -1,0 +1,22 @@
+# Rendered by hosh-deploy on the first deploy (copied at `register`) into
+# /root/hosh-deploy/edge/traefik/dynamic/livecode.yml. @@TOKENS@@ are filled on the box.
+# hosh.it box standard: edge Traefik (host network, file provider) → loopback port of the container.
+# REVERT = delete this file (Traefik hot-reloads the directory).
+http:
+  routers:
+    livecode:
+      rule: "Host(`@@HOST@@`)"
+      service: livecode
+      entryPoints: [@@ENTRYPOINT@@]
+      middlewares: [livecode-hsts]
+      tls: @@TLS@@
+  middlewares:
+    livecode-hsts:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+  services:
+    livecode:
+      loadBalancer:
+        servers:
+          - url: "http://@@BIND@@"
