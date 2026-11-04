@@ -758,7 +758,10 @@ function startRoom(roomId: string) {
   // The previewed page gets NO colour-scheme handling of ours: its frame host is `color-scheme: light dark`
   // in app.css, which is exactly what a top-level tab gets (the OS preference reaches the page's
   // prefers-color-scheme, the default canvas when the page declares nothing) and never the editor theme.
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => renderStatusBar(settings.get()));
+  matchMedia("(prefers-color-scheme: dark)").addEventListener(
+    "change",
+    () => renderStatusBar(settings.get()),
+  );
 
   function labelButtons() {
     const set = (id: string, cmd: string, base: string) => {
