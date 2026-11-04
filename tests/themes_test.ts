@@ -87,6 +87,28 @@ for (const t of THEMES) {
   });
 }
 
+/** sRGB mix like CSS color-mix(in srgb, a p, b) — also what alpha compositing over b gives. */
+function mix(a: string, b: string, p: number): string {
+  const ch = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [x, y] = [ch(a), ch(b)];
+  return "#" + x.map((v, i) => Math.round(v * p + y[i] * (1 - p)).toString(16).padStart(2, "0")).join("");
+}
+
+for (const t of THEMES.filter((t) => !t.highContrast)) {
+  Deno.test(`theme ${t.id}: text on glass stays readable at the brightest backdrop point`, () => {
+    // app.css: --app-bg = panel 60 % over bg; backdrop glows = accent 22 %, tok-func 16 %; glass = panel 78 %
+    const v = themeVars(t.id);
+    const app = mix(v.panel, v.bg, 0.6);
+    for (const back of [mix(v.accent, app, 0.22), mix(v["tok-func"], app, 0.16), app]) {
+      const glass = mix(v.panel, back, 0.78);
+      for (const k of ["fg", "muted"]) {
+        const c = contrast(v[k], glass);
+        assert(c >= 4.5, `${t.id}: --${k} on glass ${glass} = ${c.toFixed(2)}`);
+      }
+    }
+  });
+}
+
 Deno.test("peer colours: visible on every theme, readable black label", () => {
   const bgs = THEMES.flatMap((t) => [themeVars(t.id).bg, themeVars(t.id).line]);
   for (const c of PEER_COLORS) {

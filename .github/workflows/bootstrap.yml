@@ -41,7 +41,7 @@ jobs:
             echo "== lint";   deno lint 2>&1 || echo "LINT FAILED"
             echo "== check";  deno check src/ tests/ scripts/ e2e/ 2>&1 || echo "CHECK FAILED"
             echo "== test";   deno task test 2>&1 || echo "TEST FAILED"
-            echo "== e2e";    CHROME_PATH="$(command -v google-chrome || command -v chromium)" deno task e2e 2>&1 || echo "E2E FAILED"
+            echo "== e2e";    SCREENSHOT_DIR=/tmp/shots CHROME_PATH="$(command -v google-chrome || command -v chromium)" deno task e2e 2>&1 || echo "E2E FAILED"
           } | tee /tmp/report.txt
       - uses: actions/upload-artifact@v7
         with:
@@ -50,3 +50,4 @@ jobs:
             /tmp/deno.lock
             /tmp/fmt.patch
             /tmp/report.txt
+            /tmp/shots/

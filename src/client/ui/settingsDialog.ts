@@ -53,18 +53,60 @@ export class SettingsDialog {
     this.sync();
   }
 
-  open(section?: "keyboard" | "profile") {
+  open(section?: "keyboard" | "profile" | "editor" | "appearance") {
     if (!this.dlg.open) this.dlg.showModal();
-    if (section === "keyboard") {
-      $("keyboard-fieldset").scrollIntoView({ block: "start" });
-      $("kb-filter").focus();
-    } else if (section === "profile") {
-      $("set-name").focus();
+    if (section) this.showSection(section === "keyboard" ? "st-keyboard" : `st-${section}`, false);
+    if (section === "keyboard") $("kb-filter").focus();
+    else if (section === "profile") $("set-name").focus();
+    else if (section === "editor") $("set-tab").focus();
+    else this.currentTab().focus();
+  }
+
+  private readonly tabs = (): HTMLButtonElement[] => [
+    ...$("settings-tabs").querySelectorAll<HTMLButtonElement>("[role=tab]"),
+  ];
+
+  private currentTab(): HTMLButtonElement {
+    return this.tabs().find((t) => t.getAttribute("aria-selected") === "true") ?? this.tabs()[0];
+  }
+
+  /** Vertical tabs (Appearance / Editor / Keymap / You): one section shown at a time. */
+  private showSection(tabId: string, focus: boolean) {
+    for (const t of this.tabs()) {
+      const on = t.id === tabId;
+      t.setAttribute("aria-selected", String(on));
+      t.tabIndex = on ? 0 : -1;
+      $(t.getAttribute("aria-controls")!).hidden = !on;
+      if (on && focus) t.focus();
     }
   }
 
   private buildStatic() {
     const s = this.store;
+    const tabsEl = $("settings-tabs");
+    this.showSection("st-appearance", false);
+    tabsEl.addEventListener("click", (e) => {
+      const t = (e.target as HTMLElement).closest<HTMLButtonElement>("[role=tab]");
+      if (t) this.showSection(t.id, true);
+    });
+    tabsEl.addEventListener("keydown", (e) => {
+      const tabs = this.tabs();
+      const i = tabs.indexOf(this.currentTab());
+      const n = e.key === "ArrowDown" || e.key === "ArrowRight"
+        ? (i + 1) % tabs.length
+        : e.key === "ArrowUp" || e.key === "ArrowLeft"
+        ? (i + tabs.length - 1) % tabs.length
+        : e.key === "Home"
+        ? 0
+        : e.key === "End"
+        ? tabs.length - 1
+        : -1;
+      if (n < 0) return;
+      e.preventDefault();
+      this.showSection(tabs[n].id, true);
+    });
+    const scheme = $<HTMLSelectElement>("set-preview-scheme");
+    scheme.addEventListener("change", () => s.update({ previewScheme: scheme.value as "system" | "light" | "dark" }));
     const theme = $<HTMLSelectElement>("set-theme");
     theme.replaceChildren(...THEME_CHOICES.map((t) => h("option", { value: t.id, text: t.label })));
     theme.addEventListener("change", () => s.update({ theme: theme.value }));
@@ -187,6 +229,7 @@ export class SettingsDialog {
     set("set-tab", String(v.tabSize));
     set("set-delay", String(v.previewDelay));
     set("set-layout", v.layout);
+    set("set-preview-scheme", v.previewScheme);
     set("set-vimrc", v.vimrc);
     $<HTMLInputElement>("set-wrap").checked = v.lineWrap;
     $("vimrc-field").hidden = v.keymap !== "vim";

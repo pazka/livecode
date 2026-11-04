@@ -14,6 +14,14 @@ import { RoomManager } from "../src/server/rooms.ts";
 import { Store } from "../src/server/store.ts";
 
 const CHROME = Deno.env.get("CHROME_PATH") ?? "/usr/bin/google-chrome";
+/** Set (bootstrap workflow) to save screenshots of the UI for review. */
+const SHOTS = Deno.env.get("SCREENSHOT_DIR");
+async function shot(p: Page, name: string) {
+  if (!SHOTS) return;
+  await Deno.mkdir(SHOTS, { recursive: true });
+  await new Promise((r) => setTimeout(r, 400)); // let transitions settle
+  await p.screenshot({ path: `${SHOTS}/${name}.png` });
+}
 
 async function previewFrame(page: Page): Promise<Frame> {
   // the visible frame is the one without the "pending" class
@@ -61,6 +69,7 @@ Deno.test({
 
       // landing → new room
       await a.goto(`${base}/`);
+      await shot(a, "01-landing");
       await a.click("#new-room");
       await a.waitForURL(/\/r\/[a-z2-9]{12}$/);
       const roomUrl = a.url();
@@ -72,6 +81,7 @@ Deno.test({
       await a.waitForFunction(() => (globalThis as any).__livecode.peers() === 2);
       assertEquals(await b.locator("#peers li").count(), 2);
       assertEquals(await previewText(a, "h1"), "Hello, live code!");
+      await shot(a, "02-room-light");
 
       // A edits; B's preview refreshes by itself (debounced)
       await a.evaluate(() =>
@@ -99,6 +109,7 @@ Deno.test({
         (globalThis as any).__livecode.text("html").includes('<p id="typed">typed')
       );
       await b.waitForSelector("#panel-html .cm-ySelectionCaret", { timeout: 5_000 });
+      await shot(b, "03-room-remote-cursor");
 
       // the JS file runs in the preview; console output reaches the console panel
       await b.evaluate(() =>
@@ -130,6 +141,36 @@ Deno.test({
       await a.waitForFunction(() => (globalThis as any).__livecode.theme() === "hc-dark");
       assertEquals(await b.evaluate(() => (globalThis as any).__livecode.theme()), before);
 
+      // the page in the preview is NOT restyled by the editor theme (owner bug, X.17): the starter CSS says
+      // `color-scheme: light dark`; with a light OS the text stays black under a dark editor theme …
+      const bodyColor = async (p: Page) =>
+        (await previewFrame(p)).evaluate(() => getComputedStyle(document.body).color);
+      const expectColor = async (p: Page, want: string) => {
+        // the scheme reaches the out-of-process frame asynchronously: poll briefly
+        let got = "";
+        for (let i = 0; i < 40 && got !== want; i++) {
+          got = await bodyColor(p);
+          if (got !== want) await new Promise((r) => setTimeout(r, 100));
+        }
+        assertEquals(got, want);
+      };
+      await expectColor(a, "rgb(0, 0, 0)");
+      await shot(a, "04-room-hc-dark");
+      // … and the page's own scheme switch changes it, live
+      await a.click('#scheme-seg [data-scheme="dark"]');
+      await expectColor(a, "rgb(255, 255, 255)");
+      await a.click('#scheme-seg [data-scheme="system"]');
+      await expectColor(a, "rgb(0, 0, 0)");
+
+      // a dark theme for the screenshots, by the status bar widget
+      await a.click("#sb-theme");
+      await a.waitForSelector("#palette[open]");
+      assertEquals(await a.inputValue("#palette-input"), "theme ");
+      await a.keyboard.type("dark");
+      await shot(a, "05-palette");
+      await a.keyboard.press("Enter");
+      await a.waitForFunction(() => (globalThis as any).__livecode.theme() === "dark");
+
       // keymap switch to Vim from the palette: the vim status panel appears, `:w` runs the preview
       await a.keyboard.press("F1");
       await a.keyboard.type("keymap vim");
@@ -148,6 +189,9 @@ Deno.test({
       // settings dialog opens with its shortcut table filled
       await a.click("#settings-btn");
       await a.waitForSelector("#settings[open]");
+      await shot(a, "06-settings");
+      await a.click("#st-keyboard");
+      await shot(a, "07-settings-keymap");
       assert((await a.locator("#kb-table tbody tr").count()) > 40);
       await a.keyboard.press("Escape");
 

@@ -81,6 +81,7 @@ export class SharedEditor {
     awareness: Awareness,
     opts: EditorOptions,
     onLimit: (file: FileId) => void = () => {},
+    onCursor: (file: FileId, line: number, col: number) => void = () => {},
   ) {
     const state = EditorState.create({
       doc: ytext.toString(),
@@ -111,6 +112,12 @@ export class SharedEditor {
         yCollab(ytext, awareness, { undoManager: false }),
         remoteNotInHistory,
         fileLimit(() => onLimit(file)),
+        EditorView.updateListener.of((u) => {
+          if (!u.selectionSet && !u.docChanged && !u.focusChanged) return;
+          const head = u.state.selection.main.head;
+          const line = u.state.doc.lineAt(head);
+          onCursor(file, line.number, head - line.from + 1);
+        }),
         editorTheme,
         EditorView.contentAttributes.of({
           "aria-label": `${FILE_LABELS[file]} code, shared with the room`,

@@ -11,183 +11,260 @@
 <script type="module" src="/app.js?v=@@JS_HASH@@"></script>
 </head>
 <body>
+<div class="backdrop" aria-hidden="true"></div>
 <a class="skip-link" href="#editor-area">Skip to the editor</a>
 
 <!-- Landing (/) -->
 <main id="landing" class="landing" hidden>
-  <h1>livecode</h1>
-  <p class="lead">Write HTML, CSS and JavaScript <strong>together</strong>: everyone sees each other's cursor, and
-    the page refreshes live for all.</p>
-  <p><a class="button primary" href="/new" id="new-room">Start a new room</a></p>
-  <form id="join-form" class="join">
-    <label for="join-input">Or join a room (link or name)</label>
-    <div class="row">
-      <input id="join-input" name="room" autocomplete="off" spellcheck="false" placeholder="https://…/r/… or my-room"
-        aria-describedby="join-hint">
-      <button type="submit">Join</button>
-    </div>
-    <p id="join-hint" class="hint">Room names: letters a–z, digits and dashes, 4 to 40 characters. Anyone with the
-      link can edit.</p>
-    <p id="join-error" class="error" role="alert"></p>
-  </form>
-  <section aria-labelledby="recent-title" id="recent" hidden>
-    <h2 id="recent-title">Your recent rooms</h2>
-    <ul id="recent-list"></ul>
-  </section>
-  <p class="hint">Themes, keymaps (VS Code, JetBrains, Sublime, Vim, Emacs) and every shortcut are set per person,
-    in this browser: open a room, then <em>Settings</em>.</p>
+  <div class="landing-card glass">
+    <div class="landing-brand"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M12 10l-6 6 6 6M20 10l6 6-6 6"/></svg>
+      <h1>livecode</h1></div>
+    <p class="lead">Write HTML, CSS and JavaScript <strong>together</strong>. Everyone sees each other's cursor, and
+      the page refreshes live for all.</p>
+    <p><a class="button primary big" href="/new" id="new-room">
+      <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>Start a new room</a></p>
+    <form id="join-form" class="join">
+      <label for="join-input">Or join a room — paste a link or type a name</label>
+      <div class="row">
+        <input id="join-input" name="room" autocomplete="off" spellcheck="false" placeholder="https://…/r/… or my-room"
+          aria-describedby="join-hint">
+        <button type="submit">Join</button>
+      </div>
+      <p id="join-hint" class="hint">Letters a–z, digits and dashes, 4 to 40 characters. Anyone with the link can
+        edit; idle rooms are deleted after 7 days.</p>
+      <p id="join-error" class="error" role="alert"></p>
+    </form>
+    <section aria-labelledby="recent-title" id="recent" hidden>
+      <h2 id="recent-title">Your recent rooms</h2>
+      <ul id="recent-list"></ul>
+    </section>
+    <p class="hint">Themes, keymaps (VS Code, JetBrains, Sublime, Vim, Emacs) and every shortcut are yours, saved in
+      this browser.</p>
+  </div>
 </main>
 
 <!-- Room (/r/<id>) -->
 <div id="app" class="app" hidden>
-  <header class="bar">
-    <a class="brand" href="/" title="livecode home">livecode</a>
-    <span class="room" id="room-name"></span>
-    <button type="button" id="copy-link" class="ghost">Copy link</button>
-    <span id="conn-status" class="status" role="status" data-state="connecting">Connecting…</span>
-    <ul id="peers" class="peers" aria-label="People in this room"></ul>
-    <span class="spacer"></span>
-    <button type="button" id="run-btn" class="primary">Run</button>
-    <label class="toggle"><input type="checkbox" id="auto-run"> Auto-refresh</label>
-    <button type="button" id="palette-btn" class="ghost">Commands</button>
-    <button type="button" id="settings-btn" class="ghost">Settings</button>
-    <button type="button" id="help-btn" class="ghost" aria-label="Keyboard help">?</button>
+  <header class="toolbar glass">
+    <div class="tb-group">
+      <a class="brand" href="/" aria-label="livecode home">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M12 10l-6 6 6 6M20 10l6 6-6 6"/></svg>
+      </a>
+      <div class="project" title="Room — anyone with the link can edit">
+        <span class="project-badge" aria-hidden="true"></span>
+        <span id="room-name" class="room"></span>
+        <button type="button" id="copy-link" class="icon-btn" aria-label="Copy the room link">
+          <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.8 2.8 0 014 4l-1 1M9 11.5l-1 1a2.8 2.8 0 01-4-4l1-1"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="tb-group tb-center">
+      <button type="button" id="run-btn" class="run-btn">
+        <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M5 3.5v9l7.5-4.5z"/></svg><span>Run</span>
+      </button>
+      <label class="switch" title="Refresh the preview by itself after each edit">
+        <input type="checkbox" id="auto-run" role="switch"><span class="track" aria-hidden="true"></span><span>Live</span>
+      </label>
+    </div>
+    <div class="tb-group tb-right">
+      <ul id="peers" class="avatars" aria-label="People in this room"></ul>
+      <button type="button" id="palette-btn" class="search-btn">
+        <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+        <span class="label">Commands</span><kbd id="palette-kbd" aria-hidden="true"></kbd>
+      </button>
+      <button type="button" id="settings-btn" class="icon-btn" aria-label="Settings">
+        <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.8M8 12.4v1.8M1.8 8h1.8M12.4 8h1.8M3.6 3.6l1.3 1.3M11.1 11.1l1.3 1.3M3.6 12.4l1.3-1.3M11.1 4.9l1.3-1.3"/></svg>
+      </button>
+      <button type="button" id="help-btn" class="icon-btn" aria-label="Keyboard help">
+        <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M6.3 6.2a1.8 1.8 0 113.2 1.2c-.6.5-1.5.9-1.5 1.9M8 11.4v.1"/></svg>
+      </button>
+    </div>
   </header>
-  <div id="banner" class="banner" role="alert" hidden></div>
+  <div id="banner" class="banner glass" role="alert" hidden></div>
 
   <main id="workspace" class="workspace" data-layout="columns">
-    <section id="editor-area" class="editor-area" aria-label="Code" tabindex="-1">
-      <div class="tabs-row">
+    <section id="editor-area" class="island editor-island" aria-label="Code" tabindex="-1">
+      <div class="island-head">
         <div role="tablist" aria-label="Files" id="tabs" class="tabs">
-          <button role="tab" id="tab-html" aria-controls="panel-html" data-file="html">HTML<span class="dots"
-              aria-hidden="true"></span></button>
-          <button role="tab" id="tab-css" aria-controls="panel-css" data-file="css">CSS<span class="dots"
-              aria-hidden="true"></span></button>
-          <button role="tab" id="tab-js" aria-controls="panel-js" data-file="js">JavaScript<span class="dots"
-              aria-hidden="true"></span></button>
+          <button role="tab" id="tab-html" aria-controls="panel-html" data-file="html"><span class="ft ft-html"
+              aria-hidden="true">&lt;/&gt;</span>index.html<span class="dots" aria-hidden="true"></span></button>
+          <button role="tab" id="tab-css" aria-controls="panel-css" data-file="css"><span class="ft ft-css"
+              aria-hidden="true">#</span>style.css<span class="dots" aria-hidden="true"></span></button>
+          <button role="tab" id="tab-js" aria-controls="panel-js" data-file="js"><span class="ft ft-js"
+              aria-hidden="true">JS</span>script.js<span class="dots" aria-hidden="true"></span></button>
         </div>
-        <label class="toggle module-toggle" id="module-toggle" hidden><input type="checkbox" id="js-module">
-          Run as module (shared)</label>
+        <span class="spacer"></span>
+        <label class="switch small" id="module-toggle" hidden title="Shared with the room">
+          <input type="checkbox" id="js-module" role="switch"><span class="track" aria-hidden="true"></span><span>ES module</span>
+        </label>
       </div>
       <div role="tabpanel" id="panel-html" aria-labelledby="tab-html" class="panel"></div>
       <div role="tabpanel" id="panel-css" aria-labelledby="tab-css" class="panel" hidden></div>
       <div role="tabpanel" id="panel-js" aria-labelledby="tab-js" class="panel" hidden></div>
-      <p id="editor-help" class="sr-only">Press Escape then Tab to leave the editor. Shortcuts: open the command list.</p>
+      <p id="editor-help" class="sr-only">Press Escape then Tab to leave the editor. Open the command list for every
+        shortcut.</p>
     </section>
 
     <div id="splitter" class="splitter" role="separator" tabindex="0" aria-controls="editor-area"
       aria-label="Resize code and preview" aria-valuemin="15" aria-valuemax="85" aria-valuenow="50"></div>
 
-    <section id="preview-area" class="preview-area" aria-labelledby="preview-title">
-      <div class="preview-head">
-        <h2 id="preview-title">Preview</h2>
-        <span id="preview-status" class="hint" aria-live="polite"></span>
+    <section id="preview-area" class="island preview-island" aria-labelledby="preview-title">
+      <div class="island-head">
+        <div class="urlbar">
+          <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>
+          <h2 id="preview-title">Preview</h2>
+          <span id="preview-status" class="muted" aria-live="polite"></span>
+        </div>
         <span class="spacer"></span>
-        <button type="button" id="console-btn" class="ghost" aria-expanded="false" aria-controls="console">Console
-          <span id="console-count" class="count" hidden></span></button>
+        <div class="seg" role="radiogroup" aria-label="Colour scheme of the page" id="scheme-seg">
+          <button type="button" role="radio" data-scheme="system" aria-label="Page follows the system colour scheme" title="Follow the system">
+            <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path class="fill" d="M8 2.5a5.5 5.5 0 010 11z"/></svg></button>
+          <button type="button" role="radio" data-scheme="light" aria-label="Page in light scheme" title="Light page">
+            <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg></button>
+          <button type="button" role="radio" data-scheme="dark" aria-label="Page in dark scheme" title="Dark page">
+            <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 9.6A5.5 5.5 0 016.4 3a5.5 5.5 0 106.6 6.6z"/></svg></button>
+        </div>
+        <button type="button" id="console-btn" class="icon-btn with-count" aria-expanded="false" aria-controls="console"
+          aria-label="Console">
+          <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M4.5 6l2 2-2 2M8 10.5h3.5"/></svg>
+          <span id="console-count" class="count" hidden></span>
+        </button>
       </div>
       <div id="preview-frames" class="preview-frames"></div>
       <section id="console" class="console" aria-label="Console of the preview" hidden>
         <div class="console-head">
           <h2>Console</h2>
           <span class="spacer"></span>
-          <button type="button" id="console-clear" class="ghost">Clear</button>
+          <button type="button" id="console-clear" class="ghost small">Clear</button>
         </div>
         <ol id="console-list" class="console-list" role="log" aria-live="polite" tabindex="0"></ol>
       </section>
     </section>
   </main>
+
+  <footer class="statusbar glass">
+    <span id="conn-status" class="status" role="status" data-state="connecting">Connecting…</span>
+    <span class="spacer"></span>
+    <span id="sb-pos" class="sb-text">Ln 1, Col 1</span>
+    <button type="button" id="sb-indent" class="sb-btn" title="Indent width (settings)"></button>
+    <button type="button" id="sb-keymap" class="sb-btn" title="Switch keymap"></button>
+    <button type="button" id="sb-theme" class="sb-btn" title="Switch theme"></button>
+  </footer>
 </div>
 
 <!-- Command palette -->
-<dialog id="palette" class="palette" aria-labelledby="palette-label">
+<dialog id="palette" class="palette glass" aria-labelledby="palette-label">
   <label id="palette-label" for="palette-input" class="sr-only">Run a command</label>
-  <input id="palette-input" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list"
-    autocomplete="off" spellcheck="false" placeholder="Type a command, a theme or a keymap…">
+  <div class="palette-input">
+    <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+    <input id="palette-input" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list"
+      autocomplete="off" spellcheck="false" placeholder="Search commands, themes, keymaps…">
+  </div>
   <ul id="palette-list" role="listbox" aria-label="Commands"></ul>
 </dialog>
 
 <!-- Settings -->
-<dialog id="settings" class="settings" aria-labelledby="settings-title">
+<dialog id="settings" class="settings glass" aria-labelledby="settings-title">
   <form method="dialog" class="settings-form" id="settings-form">
     <div class="dialog-head">
       <h2 id="settings-title">Settings</h2>
+      <span class="hint">Saved in this browser only</span>
       <span class="spacer"></span>
-      <button type="submit" class="ghost" aria-label="Close settings">Close</button>
+      <button type="submit" class="icon-btn" aria-label="Close settings">
+        <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
     </div>
-    <p class="hint">Saved in this browser only. Your name and colour are shown to the room.</p>
+    <div class="settings-body">
+      <nav class="settings-nav" aria-label="Settings sections">
+        <div role="tablist" aria-orientation="vertical" id="settings-tabs">
+          <button type="button" role="tab" id="st-appearance" aria-controls="sec-appearance">Appearance</button>
+          <button type="button" role="tab" id="st-editor" aria-controls="sec-editor">Editor</button>
+          <button type="button" role="tab" id="st-keyboard" aria-controls="keyboard-fieldset">Keymap</button>
+          <button type="button" role="tab" id="st-profile" aria-controls="sec-profile">You</button>
+        </div>
+      </nav>
+      <div class="settings-pages">
+        <fieldset id="sec-appearance" role="tabpanel" aria-labelledby="st-appearance">
+          <legend>Appearance</legend>
+          <div class="field"><label for="set-theme">Theme of the editor</label><select id="set-theme"></select></div>
+          <div class="field"><label for="set-preview-scheme">Colour scheme of the previewed page</label>
+            <select id="set-preview-scheme" aria-describedby="scheme-hint">
+              <option value="system">Follow the system (like a normal browser tab)</option>
+              <option value="light">Light</option><option value="dark">Dark</option></select>
+            <p id="scheme-hint" class="hint">Independent of the editor theme: the page looks as it would for a
+              visitor.</p></div>
+          <div class="field"><label for="set-font">Editor font size</label>
+            <input id="set-font" type="number" min="10" max="32" step="1"> px</div>
+          <div class="field"><label for="set-layout">Layout</label>
+            <select id="set-layout"><option value="columns">Side by side</option><option value="rows">Stacked</option>
+            </select></div>
+        </fieldset>
 
-    <fieldset>
-      <legend>You</legend>
-      <div class="field"><label for="set-name">Name</label>
-        <input id="set-name" maxlength="32" autocomplete="nickname"></div>
-      <div class="field"><span id="set-color-label">Cursor colour</span>
-        <div id="set-color" class="swatches" role="radiogroup" aria-labelledby="set-color-label"></div></div>
-    </fieldset>
+        <fieldset id="sec-editor" role="tabpanel" aria-labelledby="st-editor" hidden>
+          <legend>Editor</legend>
+          <div class="field"><label for="set-tab">Indent width</label>
+            <input id="set-tab" type="number" min="1" max="8" step="1"> spaces</div>
+          <div class="field"><label class="toggle"><input id="set-wrap" type="checkbox"> Wrap long lines</label></div>
+          <div class="field"><label for="set-delay">Preview refresh delay after typing</label>
+            <input id="set-delay" type="number" min="100" max="5000" step="50" aria-describedby="delay-hint"> ms
+            <p id="delay-hint" class="hint">The preview waits this long after the last keystroke (yours or anyone's)
+              before refreshing.</p></div>
+        </fieldset>
 
-    <fieldset>
-      <legend>Appearance</legend>
-      <div class="field"><label for="set-theme">Theme</label><select id="set-theme"></select></div>
-      <div class="field"><label for="set-font">Editor font size</label>
-        <input id="set-font" type="number" min="10" max="32" step="1"> px</div>
-      <div class="field"><label for="set-layout">Layout</label>
-        <select id="set-layout"><option value="columns">Side by side</option><option value="rows">Stacked</option>
-        </select></div>
-    </fieldset>
+        <fieldset id="keyboard-fieldset" role="tabpanel" aria-labelledby="st-keyboard" hidden>
+          <legend>Keymap</legend>
+          <div class="field"><label for="set-keymap">Keymap</label><select id="set-keymap"></select></div>
+          <div class="field" id="vimrc-field"><label for="set-vimrc">Vim mappings</label>
+            <textarea id="set-vimrc" rows="3" spellcheck="false" aria-describedby="vimrc-hint"
+              placeholder="imap jk <Esc>"></textarea>
+            <p id="vimrc-hint" class="hint">One per line: <code>map</code>, <code>nmap</code>, <code>imap</code>,
+              <code>vmap</code> and their <code>noremap</code> forms. <code>:w</code> runs the preview,
+              <code>:e css</code> opens a file.</p></div>
+          <div class="field shortcuts-head">
+            <label for="kb-filter">Shortcuts</label>
+            <input id="kb-filter" type="search" placeholder="Filter by name or key" aria-controls="kb-table">
+            <button type="button" id="kb-reset-all" class="ghost small">Reset all</button>
+            <button type="button" id="kb-export" class="ghost small">Export</button>
+            <button type="button" id="kb-import" class="ghost small">Import</button>
+            <input id="kb-import-file" type="file" accept="application/json,.json" hidden>
+          </div>
+          <p class="hint" id="kb-hint">Choose <em>Change</em>, then press the new keys (two strokes make a chord, like
+            Ctrl+K Ctrl+S). Escape cancels, Backspace alone removes the shortcut.</p>
+          <p id="kb-status" class="hint" role="status"></p>
+          <div class="table-wrap"><table id="kb-table" class="kb-table">
+            <thead><tr><th scope="col">Command</th><th scope="col">Keys</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </fieldset>
 
-    <fieldset>
-      <legend>Editor</legend>
-      <div class="field"><label for="set-tab">Indent width</label>
-        <input id="set-tab" type="number" min="1" max="8" step="1"> spaces</div>
-      <div class="field"><label class="toggle"><input id="set-wrap" type="checkbox"> Wrap long lines</label></div>
-      <div class="field"><label for="set-delay">Preview refresh delay after typing</label>
-        <input id="set-delay" type="number" min="100" max="5000" step="50" aria-describedby="delay-hint"> ms
-        <p id="delay-hint" class="hint">The preview waits this long after the last keystroke (yours or anyone's)
-          before refreshing.</p></div>
-    </fieldset>
-
-    <fieldset id="keyboard-fieldset">
-      <legend>Keyboard</legend>
-      <div class="field"><label for="set-keymap">Keymap</label><select id="set-keymap"></select></div>
-      <div class="field" id="vimrc-field"><label for="set-vimrc">Vim mappings</label>
-        <textarea id="set-vimrc" rows="3" spellcheck="false" aria-describedby="vimrc-hint"
-          placeholder="imap jk <Esc>"></textarea>
-        <p id="vimrc-hint" class="hint">One per line: <code>map</code>, <code>nmap</code>, <code>imap</code>,
-          <code>vmap</code> and their <code>noremap</code> forms. <code>:w</code> runs the preview,
-          <code>:e css</code> opens a file.</p></div>
-      <div class="field shortcuts-head">
-        <label for="kb-filter">Shortcuts</label>
-        <input id="kb-filter" type="search" placeholder="Filter by name or key" aria-controls="kb-table">
-        <button type="button" id="kb-reset-all" class="ghost">Reset all</button>
-        <button type="button" id="kb-export" class="ghost">Export</button>
-        <button type="button" id="kb-import" class="ghost">Import</button>
-        <input id="kb-import-file" type="file" accept="application/json,.json" hidden>
+        <fieldset id="sec-profile" role="tabpanel" aria-labelledby="st-profile" hidden>
+          <legend>You</legend>
+          <p class="hint">Your name and colour are shown to the people in the room.</p>
+          <div class="field"><label for="set-name">Name</label>
+            <input id="set-name" maxlength="32" autocomplete="nickname"></div>
+          <div class="field"><span id="set-color-label">Cursor colour</span>
+            <div id="set-color" class="swatches" role="radiogroup" aria-labelledby="set-color-label"></div></div>
+        </fieldset>
       </div>
-      <p class="hint" id="kb-hint">Choose <em>Change</em>, then press the new keys (two strokes make a chord, like
-        Ctrl+K Ctrl+S). Escape cancels, Backspace alone removes the shortcut.</p>
-      <p id="kb-status" class="hint" role="status"></p>
-      <div class="table-wrap"><table id="kb-table" class="kb-table">
-        <thead><tr><th scope="col">Command</th><th scope="col">Keys</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
-        <tbody></tbody>
-      </table></div>
-    </fieldset>
+    </div>
   </form>
 </dialog>
 
 <!-- Help -->
-<dialog id="help" class="help" aria-labelledby="help-title">
+<dialog id="help" class="help glass" aria-labelledby="help-title">
   <form method="dialog">
     <div class="dialog-head">
       <h2 id="help-title">Keyboard help</h2>
       <span class="spacer"></span>
-      <button type="submit" class="ghost">Close</button>
+      <button type="submit" class="icon-btn" aria-label="Close help">
+        <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
     </div>
     <ul class="tips">
       <li><kbd>Tab</kbd> indents inside the editor. To leave it, press <kbd>Esc</kbd> then <kbd>Tab</kbd> (or toggle
         “Tab moves focus”).</li>
       <li><kbd>F6</kbd> moves between the toolbar, the editor, the preview and the console.</li>
-      <li>The file tabs and the size handle use the arrow keys.</li>
-      <li>In the people list, a name jumps to that person's cursor.</li>
+      <li>File tabs, the size handle and the colour-scheme switch use the arrow keys.</li>
+      <li>A face in the toolbar jumps to that person's cursor. The status bar switches keymap and theme in one
+        click.</li>
     </ul>
     <div id="help-list"></div>
   </form>

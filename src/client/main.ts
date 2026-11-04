@@ -123,7 +123,7 @@ function startRoom(roomId: string) {
     const n = awareness.getStates().size;
     statusEl.dataset.state = s;
     statusEl.textContent = s === "online"
-      ? `Live · ${n} ${n === 1 ? "person" : "people"}`
+      ? `Connected · ${n} ${n === 1 ? "person" : "people"}`
       : s === "connecting"
       ? "Connecting…"
       : s === "offline"
@@ -147,7 +147,17 @@ function startRoom(roomId: string) {
   let current: FileId = "html";
   const editors = Object.fromEntries(FILES.map((f) => [
     f,
-    new SharedEditor(f, $(`panel-${f}`), texts[f], awareness, editorOptions(settings.get()), onFileLimit),
+    new SharedEditor(
+      f,
+      $(`panel-${f}`),
+      texts[f],
+      awareness,
+      editorOptions(settings.get()),
+      onFileLimit,
+      (file, line, col) => {
+        if (file === current) $("sb-pos").textContent = `Ln ${line}, Col ${col}`;
+      },
+    ),
   ])) as Record<FileId, SharedEditor>;
 
   let limitNoticeAt = 0;
@@ -177,6 +187,9 @@ function startRoom(roomId: string) {
     }
     $("module-toggle").hidden = f !== "js";
     editors[f].view.requestMeasure();
+    const st = editors[f].view.state;
+    const ln = st.doc.lineAt(st.selection.main.head);
+    $("sb-pos").textContent = `Ln ${ln.number}, Col ${st.selection.main.head - ln.from + 1}`;
     awareness.setLocalStateField("file", f);
     if (focusEditor) editors[f].focus();
   }
@@ -308,12 +321,17 @@ function startRoom(roomId: string) {
   // --- people ---
   const names = new Map<number, string>();
   const peersEl = $("peers");
+  const FILE_NAMES: Record<FileId, string> = { html: "index.html", css: "style.css", js: "script.js" };
+  const initials = (name: string) =>
+    name.trim().split(/\s+/).slice(0, 2).map((w) => [...w][0] ?? "").join("").toUpperCase() || "?";
+  const MAX_AVATARS = 7;
   function renderPeers() {
     const states = awareness.getStates();
     const me = doc.clientID;
     const items: HTMLElement[] = [];
     const dots: Record<FileId, HTMLElement[]> = { html: [], css: [], js: [] };
     const entries = [...states.entries()].sort(([a], [b]) => (a === me ? -1 : b === me ? 1 : a - b));
+    const hidden: string[] = [];
     for (const [id, st] of entries) {
       const u = st.user as { name?: string; color?: string } | undefined;
       if (!u?.name) continue;
@@ -321,22 +339,38 @@ function startRoom(roomId: string) {
       const f = (FILES as readonly string[]).includes(st.file) ? st.file as FileId : "html";
       const self = id === me;
       if (!self) dots[f].push(h("i", { style: `background:${u.color}` }));
+      if (items.length >= MAX_AVATARS) {
+        hidden.push(u.name);
+        continue;
+      }
+      const label = `${u.name}${self ? " (you)" : ""}, in ${FILE_NAMES[f]}${
+        self ? ": open your settings" : ": show their cursor"
+      }`;
       items.push(h(
         "li",
         {},
-        h(
-          "button",
-          {
-            type: "button",
-            "data-client": id,
-            "aria-label": `${u.name}${self ? " (you)" : ""}, in ${FILE_LABELS[f]}${
-              self ? ": open your settings" : ": show their cursor"
-            }`,
-          },
-          h("span", { class: "swatch", style: `background:${u.color}`, "aria-hidden": "true" }),
-          `${u.name}${self ? " (you)" : ""}`,
-          h("span", { class: "where", "aria-hidden": "true", text: ` · ${f.toUpperCase()}` }),
-        ),
+        h("button", {
+          type: "button",
+          class: self ? "avatar self" : "avatar",
+          "data-client": id,
+          style: `background:${u.color}`,
+          "aria-label": label,
+          title: `${u.name}${self ? " (you)" : ""} · ${FILE_NAMES[f]}`,
+          text: initials(u.name),
+        }),
+      ));
+    }
+    if (hidden.length) {
+      items.push(h(
+        "li",
+        {},
+        h("span", {
+          class: "avatar more",
+          role: "img",
+          "aria-label": `and ${hidden.length} more: ${hidden.join(", ")}`,
+          title: hidden.join(", "),
+          text: `+${hidden.length}`,
+        }),
       ));
     }
     peersEl.replaceChildren(...items);
@@ -346,7 +380,7 @@ function startRoom(roomId: string) {
       const n = dots[f].length;
       t.setAttribute(
         "aria-label",
-        `${FILE_LABELS[f]}${n ? `, ${n} ${n === 1 ? "person" : "people"} here` : ""}`,
+        `${FILE_NAMES[f]} (${FILE_LABELS[f]})${n ? `, ${n} ${n === 1 ? "other person" : "other people"} here` : ""}`,
       );
     }
     renderStatus();
@@ -684,6 +718,56 @@ function startRoom(roomId: string) {
     );
   }
 
+  // --- status bar: one click to switch keymap / theme / indent (JetBrains-style widgets) ---
+  $("sb-keymap").addEventListener("click", () => palette.open("keymap "));
+  $("sb-theme").addEventListener("click", () => palette.open("theme "));
+  $("sb-indent").addEventListener("click", () => dialog.open("editor"));
+  function renderStatusBar(s: Settings) {
+    const preset = PRESETS.find((p) => p.id === s.keymap)!;
+    const theme = THEME_CHOICES.find((t) => t.id === s.theme);
+    const resolved = THEMES.find((t) => t.id === document.documentElement.dataset.theme);
+    $("sb-keymap").textContent = `Keymap: ${preset.label.replace(/ \(.*\)$/, "")}`;
+    $("sb-keymap").setAttribute("aria-label", `Keymap ${preset.label}: switch keymap`);
+    $("sb-theme").textContent = s.theme === "system" ? `Theme: System (${resolved?.label ?? ""})` : `Theme: ${theme?.label}`;
+    $("sb-theme").setAttribute("aria-label", `${$("sb-theme").textContent}: switch theme`);
+    $("sb-indent").textContent = `${s.tabSize} spaces`;
+    $("sb-indent").setAttribute("aria-label", `Indent ${s.tabSize} spaces: open editor settings`);
+  }
+
+  // --- colour scheme of the previewed page: never the editor theme's ---
+  const schemeSeg = $("scheme-seg");
+  const schemeButtons = [...schemeSeg.querySelectorAll<HTMLButtonElement>("[role=radio]")];
+  function applyPreviewScheme(s: Settings) {
+    const used = s.previewScheme === "system"
+      ? (mq("(prefers-color-scheme: dark)") ? "dark" : "light")
+      : s.previewScheme;
+    // an iframe takes its preferred colour scheme from its element: set it here, apart from the app theme
+    $("preview-frames").style.colorScheme = used;
+    for (const b of schemeButtons) {
+      const on = b.dataset.scheme === s.previewScheme;
+      b.setAttribute("aria-checked", String(on));
+      b.tabIndex = on ? 0 : -1;
+    }
+  }
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    applyPreviewScheme(settings.get());
+    renderStatusBar(settings.get());
+  });
+  schemeSeg.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-scheme]");
+    if (b) settings.update({ previewScheme: b.dataset.scheme as Settings["previewScheme"] });
+  });
+  schemeSeg.addEventListener("keydown", (e) => {
+    const dir = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    const i = schemeButtons.findIndex((b) => b.getAttribute("aria-checked") === "true");
+    const next = schemeButtons[(i + dir + schemeButtons.length) % schemeButtons.length];
+    settings.update({ previewScheme: next.dataset.scheme as Settings["previewScheme"] });
+    next.focus();
+    announce(next.getAttribute("aria-label") ?? "");
+  });
+
   function labelButtons() {
     const set = (id: string, cmd: string, base: string) => {
       const b = $(id);
@@ -697,15 +781,27 @@ function startRoom(roomId: string) {
     set("palette-btn", "palette", "Show all commands");
     set("settings-btn", "settings", "Settings");
     set("help-btn", "help", "Keyboard help");
+    const pk = bindings.palette?.[0];
+    $("palette-kbd").textContent = pk ? safeKey(pk) : "";
   }
 
   // --- settings → everything ---
+  function safeKey(k: string): string {
+    try {
+      return displayBinding(k);
+    } catch {
+      return k;
+    }
+  }
+
   function applyAll(s: Settings, prev?: Settings) {
     applyTheme(s);
+    applyPreviewScheme(s);
     applyLayout(s);
     bindings = effectiveBindings(s.keymap, s.overrides[s.keymap]);
     matcher = makeMatcher(bindings);
     labelButtons();
+    renderStatusBar(s);
     if (!prev || prev.keymap !== s.keymap || prev.tabSize !== s.tabSize || prev.lineWrap !== s.lineWrap) {
       for (const f of FILES) editors[f].configure(editorOptions(s));
     }

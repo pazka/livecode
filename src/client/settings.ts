@@ -23,6 +23,8 @@ export interface Settings {
   /** Editor share of the workspace, percent. */
   split: number;
   consoleOpen: boolean;
+  /** Colour scheme the previewed page gets — independent of the editor theme ("system" = the OS, like a tab). */
+  previewScheme: "system" | "light" | "dark";
 }
 
 const KEY = "livecode.settings.v1";
@@ -67,6 +69,7 @@ export function defaults(): Settings {
     layout: "columns",
     split: 50,
     consoleOpen: false,
+    previewScheme: "system",
   };
 }
 
@@ -104,6 +107,9 @@ export function sanitize(raw: unknown, base: Settings = defaults()): Settings {
     layout: r.layout === "rows" || r.layout === "columns" ? r.layout : base.layout,
     split: num(r.split, 15, 85, base.split),
     consoleOpen: typeof r.consoleOpen === "boolean" ? r.consoleOpen : base.consoleOpen,
+    previewScheme: r.previewScheme === "light" || r.previewScheme === "dark" || r.previewScheme === "system"
+      ? r.previewScheme
+      : base.previewScheme,
   };
 }
 
