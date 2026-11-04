@@ -14,7 +14,7 @@ an app that follows it deploys first try. Values already fixed for this project:
 
 ## Scope of the cloud builder
 - You work on this GitHub repo only: code, tests, Dockerfile, CI. You have **no access to the
-  production server**: the one-time first install is done by an on-box session; after that,
+  production server**: a one-time on-box registration (DEPLOY.md §1b) binds the app; after that,
   releases deploy themselves (below). Never try to reach the box directly.
 - The box-side files are already scaffolded. Keep them working and adapt them, don't replace them:
   `docker-compose.example.yml` (hardening is enforced by the box), `.env.example` (box defaults +
@@ -26,7 +26,7 @@ an app that follows it deploys first try. Values already fixed for this project:
   stack's ecosystem), `workflows/dependabot-merge.yml` and `scripts/dependabot-merge.sh`. Tested
   minor/patch Dependabot PRs merge when CI is green; a `needs-review` (major) PR is yours to check:
   merge it only if CI is green and the changelog has nothing that touches this app.
-- **Deploying = cutting a release.** Once the owner has done the one-time install (DEPLOY.md §1b),
+- **Deploying = cutting a release.** Once the owner has done the one-time registration (DEPLOY.md §1b),
   every release you build is deployed by GitHub through the box's `hosh-deploy` runner, which
   verifies it and rolls back by itself. You may also run Actions → deploy (`vX.Y.Z`, `rollback`,
   `status`) and read its log. You can't reach the box any other way, and that's by design.
@@ -45,7 +45,8 @@ an app that follows it deploys first try. Values already fixed for this project:
   AFTER; `scripts/smoke.sh` BEFORE and AFTER; root only inside an owner-opened sudo window.
 - Releases deploy themselves (DEPLOY.md §1). You may run `sudo hosh-deploy deploy|rollback|status livecode …`
   any time (no sudo window needed), with an ACTIONS-LOG line. A first install follows DEPLOY.md §1b
-  exactly, inside an owner sudo window. Otherwise only read-only diagnostics.
+  exactly, inside an owner sudo window: register + key on the box; the first deploy itself is
+  Actions → deploy, never a manual `hosh-deploy deploy`. Otherwise only read-only diagnostics.
 - `livecode.env`: you may create it from `.env.example` BEFORE any secret is in it; after the owner
   has filled it, **never print, cat, grep, copy or edit it**. If a variable is wrong, name it to the
   owner and stop. Never run owner-only interactive scripts; never delete the `livecode-data` volume.

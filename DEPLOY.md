@@ -1,7 +1,8 @@
 # Deploying code.hosh.it
 
 Deployment on the hosh.it box (box standard: `docs/BOX-CONTRACT.md`). Releases deploy themselves
-through **hosh-deploy** (§1); a first install is a one-time on-box step (§1b). `.env.example`
+through **hosh-deploy** (§1); a first install is a one-time on-box registration (§1b), then the first
+deploy itself also comes from GitHub Actions. `.env.example`
 defaults already fit the box; the **owner** only provides secrets.
 
 ## 1. How releases go live (hosh-deploy — the only deploy path on the box)
@@ -34,17 +35,19 @@ sudo git fetch -q --depth 1 origin tag v0.1.0 && sudo git checkout -q v0.1.0
 ```
 **C — owner: secrets.** None: livecode has no secret (rooms are capability links). Step C is skipped.
 ```sh
-# D — pin the box config (validates the compose hardening), first deploy (writes the Traefik route)
+# D — pin the box config (validates the compose hardening). NO deploy from the box: GitHub does it (E).
 sudo hosh-deploy register livecode
-sudo hosh-deploy deploy livecode v0.1.0
-# E — GitHub key for auto-deploys (claude_agent: keygen; root: bind; gh: secret; private key shredded)
+# E — GitHub key (claude_agent: keygen; root: bind; gh: secret; private key shredded). If the agent is
+#     blocked here, the owner runs these lines with `!`.
 ssh-keygen -q -t ed25519 -N '' -C hosh-deploy:livecode -f /tmp/livecode-deploy
 sudo /home/pazka/MIGRATION/scripts/setup-hosh-deploy.sh key livecode /tmp/livecode-deploy.pub
 gh secret set HOSH_DEPLOY_KEY -R pazka/livecode < /tmp/livecode-deploy && shred -u /tmp/livecode-deploy /tmp/livecode-deploy.pub
+# F — first deploy = CI (owner rule: "the more CI the better"): writes the Traefik route, POST_DEPLOY, rollback
+gh workflow run deploy -R pazka/livecode -f version=v0.1.0
 ```
 Then add `svc_livecode` to the box smoke harness (`scripts/smoke.sh`: function, host in `TLS_HOSTS`, name
 in `SERVICES`, new `c_*` helpers in its `export -f` list) from §3, run `scripts/smoke.sh all` (AFTER),
-and test the GitHub path once: Actions → deploy → `status`.
+and check Actions → deploy → `status`.
 
 **Revert:** `cd /srv/livecode && sudo docker compose --env-file livecode.env down` (keeps the volume) +
 `sudo rm /root/hosh-deploy/edge/traefik/dynamic/livecode.yml /etc/hosh-deploy/apps/livecode.conf` +
