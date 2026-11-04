@@ -44,7 +44,10 @@ export async function runSmoke(base: string, _args: string[]): Promise<number> {
       const body = await r.text();
       const csp = r.headers.get("content-security-policy") ?? "";
       must(r.status === 200 && body.includes("/preview.js"), `preview ${r.status}`);
-      must(csp.includes("form-action 'none'") && csp.includes("frame-ancestors 'self'"), `preview csp ${csp}`);
+      must(
+        csp.includes("form-action 'none'") && csp.includes("frame-ancestors 'self'"),
+        `preview csp ${csp}`,
+      );
       return "ok";
     }],
     ["/new gives a fresh room", async () => {
@@ -77,13 +80,17 @@ export async function runSmoke(base: string, _args: string[]): Promise<number> {
     ["room persisted and reloaded", async () => {
       // the last client left: the server saves at once; give the write a moment
       const file = `${cfg.dataDir}/rooms/${room}.ydoc`;
-      await until(() => {
-        try {
-          return Deno.statSync(file).size > 0;
-        } catch {
-          return false;
-        }
-      }, 5000, "room file written");
+      await until(
+        () => {
+          try {
+            return Deno.statSync(file).size > 0;
+          } catch {
+            return false;
+          }
+        },
+        5000,
+        "room file written",
+      );
       const c = new YClient(`${ws}/ws/${room}`);
       try {
         await c.ready();
@@ -107,7 +114,9 @@ export async function runSmoke(base: string, _args: string[]): Promise<number> {
   }
   try {
     await Deno.remove(`${cfg.dataDir}/rooms/${room}.ydoc`);
-  } catch { /* not written or no access (smoke run outside the container): GC removes smoke rooms after 1 h */ }
+  } catch {
+    /* not written or no access (smoke run outside the container): GC removes smoke rooms after 1 h */
+  }
   console.log(failed ? `smoke: ${failed} FAILED` : `smoke: all ${checks.length} passed`);
   return failed ? 1 : 0;
 }

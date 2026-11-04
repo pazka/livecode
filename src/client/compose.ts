@@ -77,7 +77,9 @@ export function composeDocument(src: Sources, opts: { guard?: boolean } = {}): s
   const headBits = `<script>${RUNTIME}</script>` +
     (src.css.trim() ? `<style>${escapeStyle(src.css)}</style>` : "");
   const script = js.trim()
-    ? `<script${src.jsModule ? ' type="module"' : ""}>${escapeScript(js)}\n//# sourceURL=${JS_SOURCE_URL}\n</script>`
+    ? `<script${src.jsModule ? ' type="module"' : ""}>${
+      escapeScript(js)
+    }\n//# sourceURL=${JS_SOURCE_URL}\n</script>`
     : "";
 
   let html = src.html;

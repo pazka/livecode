@@ -26,9 +26,32 @@ export function contrast(a: string, b: string): number {
 }
 
 const REQUIRED = [
-  "bg", "line", "fg", "panel", "border", "ctl", "muted", "accent", "accent-fg", "focus", "sel", "cursor",
-  "danger", "ok", "warn", "tok-keyword", "tok-string", "tok-number", "tok-comment", "tok-tag", "tok-attr",
-  "tok-prop", "tok-func", "tok-type", "tok-op", "tok-invalid",
+  "bg",
+  "line",
+  "fg",
+  "panel",
+  "border",
+  "ctl",
+  "muted",
+  "accent",
+  "accent-fg",
+  "focus",
+  "sel",
+  "cursor",
+  "danger",
+  "ok",
+  "warn",
+  "tok-keyword",
+  "tok-string",
+  "tok-number",
+  "tok-comment",
+  "tok-tag",
+  "tok-attr",
+  "tok-prop",
+  "tok-func",
+  "tok-type",
+  "tok-op",
+  "tok-invalid",
 ];
 const TOKENS = REQUIRED.filter((k) => k.startsWith("tok-"));
 
@@ -77,7 +100,10 @@ Deno.test("theme: system follows the OS (dark, high contrast, forced colours)", 
   assertEquals(resolveTheme("system", q([])), "light");
   assertEquals(resolveTheme("system", q(["(prefers-color-scheme: dark)"])), "dark");
   assertEquals(resolveTheme("system", q(["(prefers-contrast: more)"])), "hc-light");
-  assertEquals(resolveTheme("system", q(["(prefers-contrast: more)", "(prefers-color-scheme: dark)"])), "hc-dark");
+  assertEquals(
+    resolveTheme("system", q(["(prefers-contrast: more)", "(prefers-color-scheme: dark)"])),
+    "hc-dark",
+  );
   assertEquals(resolveTheme("system", q(["(forced-colors: active)"])), "hc-light");
   assertEquals(resolveTheme("dim", q([])), "dim");
   assertEquals(resolveTheme("bogus", q([])), "light");

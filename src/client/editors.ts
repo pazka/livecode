@@ -16,7 +16,13 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 import { history } from "@codemirror/commands";
-import { bracketMatching, foldGutter, indentOnInput, indentUnit, syntaxHighlighting } from "@codemirror/language";
+import {
+  bracketMatching,
+  foldGutter,
+  indentOnInput,
+  indentUnit,
+  syntaxHighlighting,
+} from "@codemirror/language";
 import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
 import { highlightSelectionMatches, search } from "@codemirror/search";
 import { html } from "@codemirror/lang-html";

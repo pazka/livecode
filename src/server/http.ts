@@ -108,7 +108,10 @@ export function makeHandler(deps: Deps) {
     try {
       res = await route(req, url, info, deps, startedAt);
     } catch (e) {
-      log("error", "handler error", { path: url.pathname.slice(0, 64), error: e instanceof Error ? e.name : "error" });
+      log("error", "handler error", {
+        path: url.pathname.slice(0, 64),
+        error: e instanceof Error ? e.name : "error",
+      });
       res = json({ error: "internal" }, 500, false);
     }
     if (url.pathname !== "/healthz" && res.status !== 101) {
@@ -145,18 +148,27 @@ async function route(
   if (path === "/healthz") {
     const writable = await rooms.store.probe();
     const s = rooms.stats();
-    return json({
-      status: writable ? "ok" : "degraded",
-      version: cfg.version,
-      storage: writable ? "writable" : "error",
-      rooms: { live: s.live, stored: s.stored },
-      connections: s.connections,
-      uptime_s: Math.round((Date.now() - startedAt) / 1000),
-    }, writable ? 200 : 503, head);
+    return json(
+      {
+        status: writable ? "ok" : "degraded",
+        version: cfg.version,
+        storage: writable ? "writable" : "error",
+        rooms: { live: s.live, stored: s.stored },
+        connections: s.connections,
+        uptime_s: Math.round((Date.now() - startedAt) / 1000),
+      },
+      writable ? 200 : 503,
+      head,
+    );
   }
   if (path === "/robots.txt") return text(ROBOTS, 200, head, { "cache-control": "public, max-age=86400" });
   if (path === "/new") {
-    return respond(null, 303, { ...APP_HEADERS, location: `/r/${newRoomId()}`, "cache-control": "no-store" }, head);
+    return respond(
+      null,
+      303,
+      { ...APP_HEADERS, location: `/r/${newRoomId()}`, "cache-control": "no-store" },
+      head,
+    );
   }
   if (path === "/preview") {
     const a = assets.get("/preview.html");
@@ -167,12 +179,16 @@ async function route(
     return a ? serveAsset(req, a, PREVIEW_HEADERS, head) : text("not found", 404, head);
   }
   if (path === "/" || path.startsWith("/r/")) {
-    if (path !== "/" && !isRoomId(path.slice(3))) return text("not found: room names are a-z, 0-9 and -", 404, head);
+    if (path !== "/" && !isRoomId(path.slice(3))) {
+      return text("not found: room names are a-z, 0-9 and -", 404, head);
+    }
     const a = assets.get("/index.html");
     return a ? serveAsset(req, a, APP_HEADERS, head) : text("not built", 503, head);
   }
   const asset = assets.get(path);
-  if (asset && path !== "/index.html" && path !== "/preview.html") return serveAsset(req, asset, APP_HEADERS, head);
+  if (asset && path !== "/index.html" && path !== "/preview.html") {
+    return serveAsset(req, asset, APP_HEADERS, head);
+  }
   return text("not found", 404, head);
 }
 
@@ -188,7 +204,9 @@ function upgrade(
   if ((req.headers.get("upgrade") ?? "").toLowerCase() !== "websocket") {
     return text("websocket upgrade required", 426, false, { upgrade: "websocket" });
   }
-  if (!originAllowed(req.headers.get("origin"), cfg.baseUrl, url.href)) return text("forbidden origin", 403, false);
+  if (!originAllowed(req.headers.get("origin"), cfg.baseUrl, url.href)) {
+    return text("forbidden origin", 403, false);
+  }
 
   const ip = clientIp(info.remoteAddr.hostname, req.headers.get("x-forwarded-for"), cfg.trustedProxies);
   const { socket, response } = Deno.upgradeWebSocket(req, { idleTimeout: 30 });
@@ -196,7 +214,7 @@ function upgrade(
   const conn: Conn = {
     ip,
     send(d) {
-      if (socket.readyState === WebSocket.OPEN) socket.send(d);
+      if (socket.readyState === WebSocket.OPEN) socket.send(d as Uint8Array<ArrayBuffer>);
     },
     close(code, reason) {
       try {

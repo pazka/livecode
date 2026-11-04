@@ -42,7 +42,11 @@ Deno.test("config: defaults are the box values, bad numbers fall back, env list 
   assertEquals(c.baseUrl, "https://code.hosh.it");
   assertEquals(c.trustedProxies, ["127.0.0.0/8", "::1/128", "172.16.0.0/12"]);
   assertEquals(c.limits.maxDocBytes, 1024 * 1024);
-  const env: Record<string, string> = { LIVECODE_MAX_DOC_KB: "-5", LIVECODE_MAX_PEERS_PER_ROOM: "abc", APP_BASE_URL: "https://x.test/" };
+  const env: Record<string, string> = {
+    LIVECODE_MAX_DOC_KB: "-5",
+    LIVECODE_MAX_PEERS_PER_ROOM: "abc",
+    APP_BASE_URL: "https://x.test/",
+  };
   const d = loadConfig((k) => env[k]);
   assertEquals(d.limits.maxDocBytes, 1024 * 1024);
   assertEquals(d.limits.maxPeersPerRoom, 32);

@@ -54,16 +54,19 @@ export class YClient {
       sync.writeUpdate(enc, u);
       this.ws.send(encoding.toUint8Array(enc));
     });
-    this.awareness.on("update", (ch: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {
-      if (origin !== "local" || this.ws.readyState !== WebSocket.OPEN) return;
-      const enc = encoding.createEncoder();
-      encoding.writeVarUint(enc, MSG_AWARENESS);
-      encoding.writeVarUint8Array(
-        enc,
-        awarenessProtocol.encodeAwarenessUpdate(this.awareness, ch.added.concat(ch.updated, ch.removed)),
-      );
-      this.ws.send(encoding.toUint8Array(enc));
-    });
+    this.awareness.on(
+      "update",
+      (ch: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {
+        if (origin !== "local" || this.ws.readyState !== WebSocket.OPEN) return;
+        const enc = encoding.createEncoder();
+        encoding.writeVarUint(enc, MSG_AWARENESS);
+        encoding.writeVarUint8Array(
+          enc,
+          awarenessProtocol.encodeAwarenessUpdate(this.awareness, ch.added.concat(ch.updated, ch.removed)),
+        );
+        this.ws.send(encoding.toUint8Array(enc));
+      },
+    );
   }
 
   /** Resolves once the server's state arrived (sync step 2), rejects after `ms`. */
@@ -77,7 +80,7 @@ export class YClient {
 
   /** Raw send (tests: malformed or oversized messages). */
   sendRaw(data: Uint8Array) {
-    this.ws.send(data);
+    this.ws.send(data as Uint8Array<ArrayBuffer>);
   }
 
   async close(): Promise<void> {

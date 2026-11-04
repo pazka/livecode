@@ -5,7 +5,11 @@ import { canonical, displayBinding, eventStrokes, recordStroke } from "../src/cl
 import { conflicts, effectiveBindings, isPlainKey, makeMatcher, PRESETS } from "../src/client/keymaps.ts";
 import { ALL_COMMANDS, COMMAND_BY_ID } from "../src/client/commands.ts";
 
-const ev = (key: string, code: string, mods: Partial<Record<"alt" | "ctrl" | "meta" | "shift", boolean>> = {}) => ({
+const ev = (
+  key: string,
+  code: string,
+  mods: Partial<Record<"alt" | "ctrl" | "meta" | "shift", boolean>> = {},
+) => ({
   key,
   code,
   altKey: !!mods.alt,
@@ -85,7 +89,9 @@ Deno.test("presets: Emacs and Vim keep their own prefixes", () => {
   }
   const vim = PRESETS.find((p) => p.id === "vim")!;
   for (const keys of Object.values(vim.bindings)) {
-    for (const k of keys) assert(!isPlainKey(canonical(k, false)) || /^F\d/.test(k), `vim preset binds plain ${k}`);
+    for (const k of keys) {
+      assert(!isPlainKey(canonical(k, false)) || /^F\d/.test(k), `vim preset binds plain ${k}`);
+    }
   }
 });
 

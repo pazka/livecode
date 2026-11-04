@@ -23,7 +23,17 @@ const COLOR_NAMES = [
   "Pink",
 ];
 
-const GROUP_ORDER: Group[] = ["Preview", "Files", "Edit", "Selection", "Search", "Fold", "View", "Room", "Help"];
+const GROUP_ORDER: Group[] = [
+  "Preview",
+  "Files",
+  "Edit",
+  "Selection",
+  "Search",
+  "Fold",
+  "View",
+  "Room",
+  "Help",
+];
 
 export interface KeySuspender {
   /** While recording a shortcut, the app's own key handling must stand aside. */
@@ -81,7 +91,11 @@ export class SettingsDialog {
       if (b) s.update({ color: b.dataset.color! });
     });
     sw.addEventListener("keydown", (e) => {
-      const dir = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+      const dir = e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? 1
+        : e.key === "ArrowLeft" || e.key === "ArrowUp"
+        ? -1
+        : 0;
       if (!dir) return;
       e.preventDefault();
       const i = PEER_COLORS.indexOf(s.get().color);
@@ -111,7 +125,9 @@ export class SettingsDialog {
     $<HTMLInputElement>("kb-filter").addEventListener("input", () => this.renderTable());
     $("kb-reset-all").addEventListener("click", () => {
       const p = s.get().keymap;
-      if (!confirm(`Reset every shortcut of the ${PRESET_BY_ID.get(p)?.label} keymap to its defaults?`)) return;
+      if (!confirm(`Reset every shortcut of the ${PRESET_BY_ID.get(p)?.label} keymap to its defaults?`)) {
+        return;
+      }
       const o = { ...s.get().overrides };
       delete o[p];
       s.update({ overrides: o });
@@ -246,7 +262,9 @@ export class SettingsDialog {
                 ? keys.map((k) => h("kbd", { text: safeDisplay(k) }))
                 : [h("span", { class: "none", text: "none" })]),
             ),
-            others.length ? h("span", { class: "conflict", text: `Also used by: ${others.join(", ")}` }) : null,
+            others.length
+              ? h("span", { class: "conflict", text: `Also used by: ${others.join(", ")}` })
+              : null,
           ),
           h(
             "td",
@@ -288,7 +306,9 @@ export class SettingsDialog {
       });
     // keep focus on the same button across re-renders
     const f = document.activeElement as HTMLElement | null;
-    const key = f?.dataset?.act && f.dataset.id ? `[data-act="${f.dataset.act}"][data-id="${f.dataset.id}"]` : null;
+    const key = f?.dataset?.act && f.dataset.id
+      ? `[data-act="${f.dataset.act}"][data-id="${f.dataset.id}"]`
+      : null;
     this.tbody.replaceChildren(...rows);
     if (key && f && this.dlg.contains(f) && !this.tbody.contains(f)) {
       const again = this.tbody.querySelector<HTMLElement>(key) ??

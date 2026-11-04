@@ -90,7 +90,8 @@ export class Room {
     this.doc.on("update", (update: Uint8Array, origin: unknown) => this.onUpdate(update, origin));
     this.awareness.on(
       "update",
-      (ch: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => this.onAwareness(ch, origin),
+      (ch: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) =>
+        this.onAwareness(ch, origin),
     );
   }
 
@@ -175,7 +176,10 @@ export class Room {
     if (states.size > 0) {
       const a = encoding.createEncoder();
       encoding.writeVarUint(a, MSG_AWARENESS);
-      encoding.writeVarUint8Array(a, awarenessProtocol.encodeAwarenessUpdate(this.awareness, [...states.keys()]));
+      encoding.writeVarUint8Array(
+        a,
+        awarenessProtocol.encodeAwarenessUpdate(this.awareness, [...states.keys()]),
+      );
       conn.send(encoding.toUint8Array(a));
     }
     if (this.full) {
@@ -202,7 +206,10 @@ export class Room {
     const st = this.conns.get(conn);
     if (!st) return;
     const now = Date.now();
-    st.tokens = Math.min(this.limits.msgBurst, st.tokens + ((now - st.refilledAt) / 1000) * this.limits.msgPerSecond);
+    st.tokens = Math.min(
+      this.limits.msgBurst,
+      st.tokens + ((now - st.refilledAt) / 1000) * this.limits.msgPerSecond,
+    );
     st.refilledAt = now;
     if (st.tokens < 1) return this.refuse(conn, "rate-limited", "Too many messages: reconnecting.");
     st.tokens -= 1;
@@ -224,7 +231,10 @@ export class Room {
           const upd = decoding.readVarUint8Array(dec);
           if (!this.accepts(upd.length)) {
             conn.send(
-              encodeNotice("doc-too-large", "This room reached its size limit: your last edits were not saved."),
+              encodeNotice(
+                "doc-too-large",
+                "This room reached its size limit: your last edits were not saved.",
+              ),
             );
             return;
           }
@@ -235,7 +245,9 @@ export class Room {
         }
       } else if (type === MSG_AWARENESS) {
         const upd = decoding.readVarUint8Array(dec);
-        if (upd.length > MAX_AWARENESS_BYTES) return this.refuse(conn, "bad-message", "Presence message too large.");
+        if (upd.length > MAX_AWARENESS_BYTES) {
+          return this.refuse(conn, "bad-message", "Presence message too large.");
+        }
         awarenessProtocol.applyAwarenessUpdate(this.awareness, upd, conn);
         if (st.ids.size > MAX_IDS_PER_CONN) return this.refuse(conn, "bad-message", "Too many presence ids.");
       } else {

@@ -128,10 +128,17 @@ export const editorTheme = EditorView.theme({
 });
 
 export const highlightStyle = HighlightStyle.define([
-  { tag: [t.keyword, t.controlKeyword, t.moduleKeyword, t.operatorKeyword, t.definitionKeyword], color: "var(--tok-keyword)" },
+  {
+    tag: [t.keyword, t.controlKeyword, t.moduleKeyword, t.operatorKeyword, t.definitionKeyword],
+    color: "var(--tok-keyword)",
+  },
   { tag: [t.string, t.special(t.string), t.regexp, t.escape], color: "var(--tok-string)" },
   { tag: [t.number, t.bool, t.null, t.atom, t.unit, t.color], color: "var(--tok-number)" },
-  { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: "var(--tok-comment)", fontStyle: "italic" },
+  {
+    tag: [t.comment, t.lineComment, t.blockComment, t.docComment],
+    color: "var(--tok-comment)",
+    fontStyle: "italic",
+  },
   { tag: [t.tagName, t.angleBracket], color: "var(--tok-tag)" },
   { tag: [t.attributeName], color: "var(--tok-attr)" },
   { tag: [t.attributeValue], color: "var(--tok-string)" },

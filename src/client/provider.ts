@@ -31,14 +31,18 @@ export class RoomProvider {
       if (origin === this) return;
       this.send(MSG_SYNC, (e) => sync.writeUpdate(e, u));
     });
-    this.awareness.on("update", (ch: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {
-      if (origin !== "local") return;
-      const changed = ch.added.concat(ch.updated, ch.removed);
-      this.send(
-        MSG_AWARENESS,
-        (e) => encoding.writeVarUint8Array(e, awarenessProtocol.encodeAwarenessUpdate(this.awareness, changed)),
-      );
-    });
+    this.awareness.on(
+      "update",
+      (ch: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {
+        if (origin !== "local") return;
+        const changed = ch.added.concat(ch.updated, ch.removed);
+        this.send(
+          MSG_AWARENESS,
+          (e) =>
+            encoding.writeVarUint8Array(e, awarenessProtocol.encodeAwarenessUpdate(this.awareness, changed)),
+        );
+      },
+    );
     addEventListener("online", () => this.retryNow());
     addEventListener("pagehide", () => {
       awarenessProtocol.removeAwarenessStates(this.awareness, [doc.clientID], "unload");

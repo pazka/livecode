@@ -44,9 +44,9 @@ out +=
 for (const [path, file, type, immutable] of files) {
   const body = await Deno.readFile(file);
   const gz = type.startsWith("image/") ? null : await gzip(body);
-  out += `  ${JSON.stringify(path)}: { type: ${JSON.stringify(type)}, immutable: ${immutable}, b64: "${b64(body)}"${
-    gz ? `, gz: "${b64(gz)}"` : ""
-  } },\n`;
+  out += `  ${JSON.stringify(path)}: { type: ${JSON.stringify(type)}, immutable: ${immutable}, b64: "${
+    b64(body)
+  }"${gz ? `, gz: "${b64(gz)}"` : ""} },\n`;
 }
 out += "};\n";
 await Deno.writeTextFile("src/server/assets.gen.ts", out);

@@ -17,7 +17,9 @@ export class Store {
     for await (const e of Deno.readDir(this.roomsDir)) {
       if (e.isFile && e.name.endsWith(".ydoc")) this.count++;
       // a crash between write and rename leaves a temp file: drop it
-      if (e.isFile && e.name.endsWith(".tmp")) await Deno.remove(`${this.roomsDir}/${e.name}`).catch(() => {});
+      if (e.isFile && e.name.endsWith(".tmp")) {
+        await Deno.remove(`${this.roomsDir}/${e.name}`).catch(() => {});
+      }
     }
   }
 

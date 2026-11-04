@@ -15,7 +15,9 @@ Deno.test({
       assertEquals(home.status, 200);
       await home.text();
       const csp = home.headers.get("content-security-policy") ?? "";
-      for (const d of ["default-src 'self'", "script-src 'self'", "frame-ancestors 'none'", "object-src 'none'"]) {
+      for (
+        const d of ["default-src 'self'", "script-src 'self'", "frame-ancestors 'none'", "object-src 'none'"]
+      ) {
         assert(csp.includes(d), `CSP lacks ${d}: ${csp}`);
       }
       assertEquals(home.headers.get("x-frame-options"), "DENY");
@@ -26,7 +28,9 @@ Deno.test({
       assertEquals(room.status, 200);
       assert((await room.text()).includes('id="app"'));
 
-      for (const bad of ["/r/AB", "/r/x", "/r/-abc", "/r/abc--def", "/r/a_b_c", "/.env", "/.git/config", "/nope"]) {
+      for (
+        const bad of ["/r/AB", "/r/x", "/r/-abc", "/r/abc--def", "/r/a_b_c", "/.env", "/.git/config", "/nope"]
+      ) {
         const r = await fetch(`${srv.base}${bad}`);
         await r.body?.cancel();
         assertEquals(r.status, 404, bad);
@@ -85,7 +89,10 @@ Deno.test({
       assertEquals(r.status, 200);
       assert((await r.text()).includes("/preview.js"));
       const csp = r.headers.get("content-security-policy") ?? "";
-      assert(csp.includes("'unsafe-inline'") && csp.includes("form-action 'none'") && csp.includes("frame-ancestors 'self'"));
+      assert(
+        csp.includes("'unsafe-inline'") && csp.includes("form-action 'none'") &&
+          csp.includes("frame-ancestors 'self'"),
+      );
       assertEquals(r.headers.get("x-frame-options"), "SAMEORIGIN");
       const js = await fetch(`${srv.base}/preview.js?v=1`);
       await js.body?.cancel();

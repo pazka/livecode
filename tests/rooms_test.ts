@@ -73,13 +73,17 @@ Deno.test({
     a.doc.getText("html").insert(0, "<!-- kept -->");
     await sleep(100);
     await a.close();
-    await until(() => {
-      try {
-        return Deno.statSync(`${srv.dataDir}/rooms/persist-me.ydoc`).size > 0;
-      } catch {
-        return false;
-      }
-    }, 3000, "saved when the last client left");
+    await until(
+      () => {
+        try {
+          return Deno.statSync(`${srv.dataDir}/rooms/persist-me.ydoc`).size > 0;
+        } catch {
+          return false;
+        }
+      },
+      3000,
+      "saved when the last client left",
+    );
     await srv.stop();
 
     const again = await startServer({ dataDir: srv.dataDir });

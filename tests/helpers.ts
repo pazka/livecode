@@ -38,7 +38,11 @@ export async function startServer(
 ): Promise<TestServer> {
   setLogLevel("error");
   const dataDir = opts.dataDir ?? await Deno.makeTempDir({ prefix: "livecode-test-" });
-  const env: Record<string, string> = { APP_DATA_DIR: dataDir, APP_BASE_URL: "http://127.0.0.1", LIVECODE_VERSION: "test" };
+  const env: Record<string, string> = {
+    APP_DATA_DIR: dataDir,
+    APP_BASE_URL: "http://127.0.0.1",
+    LIVECODE_VERSION: "test",
+  };
   const cfg = loadConfig((k) => env[k]);
   cfg.limits = { ...cfg.limits, ...opts.limits };
   const store = new Store(dataDir);

@@ -60,7 +60,7 @@
   ],
   "tasks": {
     "bundle": "mkdir -p dist/web && deno bundle --platform=browser --minify --output=dist/web/app.js src/client/main.ts",
-    "embed": "deno run --allow-read=dist,web --allow-write=dist/web/index.html,src/server/assets.gen.ts scripts/embed.ts",
+    "embed": "deno run --allow-read=dist,web --allow-write=dist/web/index.html,dist/web/preview.html,src/server/assets.gen.ts scripts/embed.ts",
     "build": "deno task bundle && deno task embed",
     "check": "deno fmt --check && deno lint && deno check src/ tests/ scripts/ e2e/",
     "test": "deno test --allow-read --allow-write --allow-net=127.0.0.1 --allow-env tests/",

@@ -43,7 +43,11 @@ export interface Notice {
 }
 
 /** Notices after which reconnecting immediately would only fail again. */
-export const FATAL_NOTICES: ReadonlySet<NoticeCode> = new Set(["room-full", "server-full", "too-many-new-rooms"]);
+export const FATAL_NOTICES: ReadonlySet<NoticeCode> = new Set([
+  "room-full",
+  "server-full",
+  "too-many-new-rooms",
+]);
 
 /** Close codes used by the server (4000–4999 = application range). */
 export const CLOSE_POLICY = 4008;

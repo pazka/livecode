@@ -4,7 +4,7 @@
 import * as Y from "yjs";
 import { EditorView } from "@codemirror/view";
 import { Vim } from "@replit/codemirror-vim";
-import { FILES, type FileId, isRoomId, type Notice } from "../shared/protocol.ts";
+import { type FileId, FILES, isRoomId, type Notice } from "../shared/protocol.ts";
 import { ALL_COMMANDS, APP_COMMANDS, COMMAND_BY_ID } from "./commands.ts";
 import { composeDocument } from "./compose.ts";
 import { FILE_LABELS, SharedEditor } from "./editors.ts";
@@ -36,7 +36,9 @@ const RECENT_KEY = "livecode.recent.v1";
 function recentRooms(): { id: string; at: number }[] {
   try {
     const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
-    return Array.isArray(v) ? v.filter((r) => r && isRoomId(r.id) && typeof r.at === "number").slice(0, 10) : [];
+    return Array.isArray(v)
+      ? v.filter((r) => r && isRoomId(r.id) && typeof r.at === "number").slice(0, 10)
+      : [];
   } catch {
     return [];
   }
@@ -281,7 +283,10 @@ function startRoom(roomId: string) {
     announce("Console cleared");
   }
   $("console-clear").addEventListener("click", clearConsole);
-  $("console-btn").addEventListener("click", () => settings.update({ consoleOpen: !settings.get().consoleOpen }));
+  $("console-btn").addEventListener(
+    "click",
+    () => settings.update({ consoleOpen: !settings.get().consoleOpen }),
+  );
 
   // --- people ---
   const names = new Map<number, string>();
@@ -322,7 +327,10 @@ function startRoom(roomId: string) {
       const f = t.dataset.file as FileId;
       t.querySelector(".dots")!.replaceChildren(...dots[f]);
       const n = dots[f].length;
-      t.setAttribute("aria-label", `${FILE_LABELS[f]}${n ? `, ${n} ${n === 1 ? "person" : "people"} here` : ""}`);
+      t.setAttribute(
+        "aria-label",
+        `${FILE_LABELS[f]}${n ? `, ${n} ${n === 1 ? "person" : "people"} here` : ""}`,
+      );
     }
     renderStatus();
   }
@@ -454,7 +462,8 @@ function startRoom(roomId: string) {
       const regions = focusRegions();
       const a = document.activeElement;
       const i = regions.findIndex((r) =>
-        r === a || r.contains(a) || (r === editors[current].view.contentDOM && editors[current].view.hasFocus) ||
+        r === a || r.contains(a) ||
+        (r === editors[current].view.contentDOM && editors[current].view.hasFocus) ||
         (r.classList.contains("bar") && r.contains(a))
       );
       const inBar = a instanceof HTMLElement && a.closest(".bar") !== null;
@@ -647,8 +656,13 @@ function startRoom(roomId: string) {
     }
     const preset = PRESETS.find((p) => p.id === s.keymap)!;
     $("help-list").replaceChildren(
-      h("p", {}, `Keymap: ${preset.label}. `, preset.ext ? `${preset.label} keys work inside the editor as usual. ` : "",
-        "Change any shortcut in Settings → Keyboard."),
+      h(
+        "p",
+        {},
+        `Keymap: ${preset.label}. `,
+        preset.ext ? `${preset.label} keys work inside the editor as usual. ` : "",
+        "Change any shortcut in Settings → Keyboard.",
+      ),
       ...[...groups].flatMap(([g, items]) => [h("h3", { text: g }), h("dl", {}, ...items)]),
     );
   }

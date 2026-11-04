@@ -89,12 +89,16 @@ Deno.test({
       // typing for real in A's editor, B sees it; A's cursor shows up in B's editor with A's name
       await a.click("#panel-html .cm-content");
       await a.keyboard.press("Control+End");
-      await a.keyboard.type("\n<p id=\"typed\">typed");
-      await b.waitForFunction(() => (globalThis as any).__livecode.text("html").includes('<p id="typed">typed'));
+      await a.keyboard.type('\n<p id="typed">typed');
+      await b.waitForFunction(() =>
+        (globalThis as any).__livecode.text("html").includes('<p id="typed">typed')
+      );
       await b.waitForSelector("#panel-html .cm-ySelectionCaret", { timeout: 5_000 });
 
       // the JS file runs in the preview; console output reaches the console panel
-      await b.evaluate(() => (globalThis as any).__livecode.setText("js", 'console.log("hi from js", 1 + 1)'));
+      await b.evaluate(() =>
+        (globalThis as any).__livecode.setText("js", 'console.log("hi from js", 1 + 1)')
+      );
       await a.waitForFunction(
         () => (globalThis as any).__livecode.console.some((e: any) => e.text === "hi from js 2"),
         null,
@@ -102,7 +106,9 @@ Deno.test({
       );
 
       // an infinite loop is stopped; the editor stays responsive
-      await b.evaluate(() => (globalThis as any).__livecode.setText("js", "let n = 0; while (true) { n++; }"));
+      await b.evaluate(() =>
+        (globalThis as any).__livecode.setText("js", "let n = 0; while (true) { n++; }")
+      );
       await a.waitForFunction(
         () => (globalThis as any).__livecode.console.some((e: any) => e.text.startsWith("Loop stopped")),
         null,
@@ -130,7 +136,9 @@ Deno.test({
       const rendersBefore = await a.evaluate(() => (globalThis as any).__livecode.renders());
       await a.keyboard.type(":w");
       await a.keyboard.press("Enter");
-      await a.waitForFunction((n) => (globalThis as any).__livecode.renders() > n, rendersBefore, { timeout: 5_000 });
+      await a.waitForFunction((n) => (globalThis as any).__livecode.renders() > n, rendersBefore, {
+        timeout: 5_000,
+      });
 
       // settings dialog opens with its shortcut table filled
       await a.click("#settings-btn");

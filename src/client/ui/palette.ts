@@ -89,14 +89,21 @@ export class Palette {
       ...this.shown.map((it, i) =>
         h(
           "li",
-          { id: `pal-${i}`, role: "option", "aria-selected": i === this.active ? "true" : "false", "data-index": i },
+          {
+            id: `pal-${i}`,
+            role: "option",
+            "aria-selected": i === this.active ? "true" : "false",
+            "data-index": i,
+          },
           h("span", { class: "label", text: it.label }),
           h("span", { class: "group", text: it.group }),
           it.keys ? h("span", { class: "keys", text: it.keys }) : null,
         )
       ),
     );
-    if (this.shown.length === 0) this.list.append(h("li", { role: "option", "aria-disabled": "true", text: "No match" }));
+    if (this.shown.length === 0) {
+      this.list.append(h("li", { role: "option", "aria-disabled": "true", text: "No match" }));
+    }
     this.input.setAttribute("aria-activedescendant", this.shown.length ? `pal-${this.active}` : "");
     this.list.querySelector(`#pal-${this.active}`)?.scrollIntoView({ block: "nearest" });
   }

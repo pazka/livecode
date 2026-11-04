@@ -282,7 +282,9 @@ export function conflicts(b: Bindings, mac = IS_MAC): Map<string, string[]> {
   // a chord whose first stroke is also a whole binding can never fire: count it as a conflict too
   for (const c of [...seen.keys()]) {
     const first = c.split(" ")[0];
-    if (c.includes(" ") && seen.has(first)) seen.set(first, [...new Set([...seen.get(first)!, ...seen.get(c)!])]);
+    if (c.includes(" ") && seen.has(first)) {
+      seen.set(first, [...new Set([...seen.get(first)!, ...seen.get(c)!])]);
+    }
   }
   return new Map([...seen].filter(([, ids]) => new Set(ids).size > 1));
 }
