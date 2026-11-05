@@ -567,6 +567,8 @@ textarea { font-family: var(--mono); width: 100%; }
 .console-list li[data-level="error"] { color: var(--danger); box-shadow: inset 3px 0 0 var(--danger); }
 .console-list li[data-level="warn"] { color: var(--warn); box-shadow: inset 3px 0 0 var(--warn); }
 .console-list li .lvl { font-weight: 700; margin-right: 0.5rem; }
+.console-list li.sep { color: var(--muted); font: italic 0.78rem/1.3 var(--ui-font); text-align: center;
+  background: var(--panel); }
 
 .statusbar {
   display: flex; align-items: center; gap: 0.15rem; min-height: 1.75rem; padding: 0 0.35rem;

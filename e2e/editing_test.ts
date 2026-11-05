@@ -638,6 +638,44 @@ Deno.test({
         await a!.click("#run-btn");
         await expectTrue(a!, `!document.querySelector("#panel-css .cm-lc-errorLine")`, "cleared", 5000);
       });
+      await check(
+        "console: each run starts empty; with Keep on, earlier output stays (with a divider)",
+        async () => {
+          const lines =
+            `[...document.querySelectorAll("#console-list li:not(.sep)")].map((l) => l.textContent)`;
+          await reset(a!, "js", 'console.log("run-mark")');
+          if (await a!.evaluate(() => document.getElementById("console")!.hidden)) {
+            await a!.click("#console-btn");
+          }
+          if (await a!.isChecked("#console-keep")) await a!.click("#console-keep");
+          await a!.click("#run-btn");
+          await expectTrue(
+            a!,
+            `${lines}.filter((t) => t.includes("run-mark")).length === 1`,
+            "one run",
+            5000,
+          );
+          await a!.click("#run-btn");
+          await sleep(1200);
+          await expectTrue(
+            a!,
+            `${lines}.filter((t) => t.includes("run-mark")).length === 1`,
+            "still one (cleared)",
+          );
+          await a!.click("#console-keep");
+          await a!.click("#run-btn");
+          await expectTrue(
+            a!,
+            `${lines}.filter((t) => t.includes("run-mark")).length === 2`,
+            "kept: two",
+            5000,
+          );
+          await expectTrue(a!, `!!document.querySelector("#console-list li.sep")`, "divider");
+          await a!.click("#console-keep"); // back to the default for the checks below
+          await hook(a!).setText("js", "");
+          await a!.click("#console-btn");
+        },
+      );
       await check("copy link: a popover says it was copied", async () => {
         await a!.click("#copy-link");
         await expectTrue(

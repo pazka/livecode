@@ -506,7 +506,10 @@ function startRoom(roomId: string) {
       jsModule: meta.get("jsModule") === true,
     }), {
     console: (e) => addConsole(e),
-    started: () => (pendingJsErrors = []),
+    started: () => {
+      pendingJsErrors = [];
+      newRunInConsole();
+    },
     pageError: (e, pending) => {
       const err: CodeError = { line: e.line, col: e.col || undefined, message: e.text };
       if (pending) pendingJsErrors.push(err);
@@ -608,10 +611,8 @@ function startRoom(roomId: string) {
   const consoleList = $("console-list");
   function addConsole(e: ConsoleEntry) {
     consoleEntries.push(e);
-    if (consoleEntries.length > 500) {
-      consoleEntries.shift();
-      consoleList.firstElementChild?.remove();
-    }
+    if (consoleEntries.length > 500) consoleEntries.shift();
+    while (consoleList.children.length >= 500) consoleList.firstElementChild?.remove();
     const atBottom = consoleList.scrollTop + consoleList.clientHeight >= consoleList.scrollHeight - 4;
     consoleList.append(
       h(
@@ -630,12 +631,25 @@ function startRoom(roomId: string) {
       c.setAttribute("aria-label", `${unseenErrors} new errors`);
     }
   }
-  function clearConsole() {
+  function clearConsole(quiet = false) {
     consoleEntries.length = 0;
     consoleList.replaceChildren();
-    announce("Console cleared");
+    unseenErrors = 0;
+    $("console-count").hidden = true;
+    if (!quiet) announce("Console cleared");
   }
-  $("console-clear").addEventListener("click", clearConsole);
+  /**
+   * A new version of the page starts: its console starts empty, unless "Keep" is on (per person, off by
+   * default) — then the earlier output stays, with a divider line for each new run.
+   */
+  function newRunInConsole() {
+    if (!settings.get().keepConsole) return clearConsole(true);
+    if (!consoleList.lastElementChild || consoleList.lastElementChild.classList.contains("sep")) return;
+    consoleList.append(h("li", { class: "sep", text: `page reloaded · ${new Date().toLocaleTimeString()}` }));
+  }
+  $("console-clear").addEventListener("click", () => clearConsole());
+  const keepBox = $<HTMLInputElement>("console-keep");
+  keepBox.addEventListener("change", () => settings.update({ keepConsole: keepBox.checked }));
   $("console-btn").addEventListener(
     "click",
     () => settings.update({ consoleOpen: !settings.get().consoleOpen }),
@@ -754,6 +768,7 @@ function startRoom(roomId: string) {
     splitter.setAttribute("aria-orientation", s.layout === "columns" ? "vertical" : "horizontal");
     splitter.setAttribute("aria-valuetext", `Code ${Math.round(s.split)} percent`);
     $("console").hidden = !s.consoleOpen;
+    $<HTMLInputElement>("console-keep").checked = s.keepConsole;
     $("console-btn").setAttribute("aria-expanded", String(s.consoleOpen));
     if (s.consoleOpen) {
       unseenErrors = 0;
@@ -821,7 +836,11 @@ function startRoom(roomId: string) {
       announce(`Auto-refresh ${settings.get().autoRun ? "on" : "off"}`);
     },
     toggleConsole: () => settings.update({ consoleOpen: !settings.get().consoleOpen }),
-    clearConsole,
+    clearConsole: () => clearConsole(),
+    toggleKeepConsole: () => {
+      settings.update({ keepConsole: !settings.get().keepConsole });
+      announce(`Keep console content between runs ${settings.get().keepConsole ? "on" : "off"}`);
+    },
     focusPreview: () => preview.focus(),
     tabHtml: () => selectTab("html", true),
     tabCss: () => selectTab("css", true),

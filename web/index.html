@@ -192,6 +192,10 @@
         <div class="console-head">
           <h2>Console</h2>
           <span class="spacer"></span>
+          <label class="switch small" title="Keep the output when the preview reloads (otherwise each run starts empty)">
+            <input type="checkbox" id="console-keep" role="switch"><span class="track" aria-hidden="true"></span><span>Keep
+              between runs</span>
+          </label>
           <button type="button" id="console-clear" class="ghost small">Clear</button>
         </div>
         <ol id="console-list" class="console-list" role="log" aria-live="polite" tabindex="0"></ol>
