@@ -14,6 +14,8 @@ import {
   keymap,
   lineNumbers,
   rectangularSelection,
+  ViewPlugin,
+  type ViewUpdate,
 } from "@codemirror/view";
 import { history } from "@codemirror/commands";
 import {
@@ -23,7 +25,13 @@ import {
   indentUnit,
   syntaxHighlighting,
 } from "@codemirror/language";
-import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
+import {
+  acceptCompletion,
+  autocompletion,
+  closeBrackets,
+  completionStatus,
+  selectedCompletion,
+} from "@codemirror/autocomplete";
 import { highlightSelectionMatches, search } from "@codemirror/search";
 import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
@@ -35,6 +43,8 @@ import { yCollab, ySyncAnnotation } from "y-codemirror.next";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
 import { type FileId, MAX_FILE_CHARS } from "../shared/protocol.ts";
+import { extraCompletions, type FileTexts } from "./completions.ts";
+import { type CaretPoint, crowdedCarets } from "./cursors.ts";
 import { fallbackKeymap, PRESET_BY_ID, type PresetId } from "./keymaps.ts";
 import { editorTheme, highlightStyle } from "./themes.ts";
 
@@ -71,6 +81,60 @@ function fileLimit(onRefused: () => void) {
   });
 }
 
+/**
+ * Tab takes the highlighted suggestion while the completion list is open (before vim / emacs and the
+ * indent-with-Tab fallback); with no list open, Tab indents as before.
+ */
+const tabAcceptsCompletion = Prec.highest(keymap.of([{
+  key: "Tab",
+  run: (view) => {
+    if (completionStatus(view.state) !== "active" || !selectedCompletion(view.state)) return false;
+    if (acceptCompletion(view)) return true;
+    // the list opened less than CodeMirror's interaction delay (75 ms) ago: take it right after that
+    setTimeout(() => acceptCompletion(view), 90);
+    return true;
+  },
+}]));
+
+/**
+ * Remote carets that crowd together (another caret, or mine, within CROWD_DISTANCE characters on the same
+ * line) get `cm-yCrowded`: their name chips are hidden (themes.ts) and come back on hover. Measured after
+ * y-codemirror has drawn its caret widgets; class changes inside widgets are not seen as edits.
+ */
+const crowdedNames = ViewPlugin.fromClass(
+  class {
+    constructor(readonly view: EditorView) {
+      this.schedule();
+    }
+    update(_u: ViewUpdate) {
+      this.schedule();
+    }
+    schedule() {
+      this.view.requestMeasure({
+        key: this,
+        read: (view) => {
+          const carets = [...view.contentDOM.querySelectorAll<HTMLElement>(".cm-ySelectionCaret")];
+          const at = (pos: number): CaretPoint => {
+            const l = view.state.doc.lineAt(pos);
+            return { line: l.number, col: pos - l.from };
+          };
+          const points = carets.map((el) => {
+            try {
+              return at(view.posAtDOM(el));
+            } catch {
+              return null;
+            }
+          });
+          const mine = view.hasFocus ? at(view.state.selection.main.head) : null;
+          return { carets, crowded: crowdedCarets(points, mine) };
+        },
+        write: ({ carets, crowded }) =>
+          carets.forEach((el, i) => el.classList.toggle("cm-yCrowded", crowded[i])),
+      });
+    }
+  },
+);
+
 export interface EditorOptions {
   keymap: PresetId;
   tabSize: number;
@@ -91,10 +155,12 @@ export class SharedEditor {
     opts: EditorOptions,
     onLimit: (file: FileId) => void = () => {},
     onCursor: (file: FileId, line: number, col: number) => void = () => {},
+    texts: FileTexts = (f) => (f === file ? ytext.toString() : ""),
   ) {
     const state = EditorState.create({
       doc: ytext.toString(),
       extensions: [
+        tabAcceptsCompletion,
         this.modal.of(modalExtension(opts.keymap)),
         lineNumbers(),
         highlightActiveLineGutter(),
@@ -117,9 +183,11 @@ export class SharedEditor {
         search({ top: true }),
         keymap.of(fallbackKeymap()),
         language(file),
+        extraCompletions(file, texts),
         this.tabs.of(tabExtension(opts.tabSize)),
         this.wrap.of(opts.lineWrap ? EditorView.lineWrapping : []),
         yCollab(ytext, awareness, { undoManager: false }),
+        crowdedNames,
         remoteNotInHistory,
         fileLimit(() => onLimit(file)),
         EditorView.updateListener.of((u) => {

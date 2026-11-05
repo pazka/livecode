@@ -128,6 +128,9 @@ export const editorTheme = EditorView.theme({
     top: "-1.35em",
     transitionDelay: "0s",
   },
+  // carets close together (cursors.ts): no name chips piled on the text, the name shows on hover
+  ".cm-ySelectionCaret.cm-yCrowded > .cm-ySelectionInfo": { opacity: "0", pointerEvents: "none" },
+  ".cm-ySelectionCaret.cm-yCrowded:hover > .cm-ySelectionInfo": { opacity: "1" },
 });
 
 export const highlightStyle = HighlightStyle.define([
