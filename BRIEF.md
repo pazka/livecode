@@ -58,6 +58,9 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
    the message at the line's end and a count on the file button. They refresh with the preview, i.e. after
    the person's own refresh delay (100–5000 ms), or on Run when auto-refresh is off.
 12. Copying the room link shows a short "Copied to clipboard" note under the button.
+13. **Console: "Keep between runs"** switch in the console header (per person, **off by default**): off, each
+   new run of the preview starts with an empty console; on, earlier output stays and a "page reloaded" divider
+   marks each run. Also in the palette.
 
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,

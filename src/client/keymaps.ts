@@ -28,6 +28,7 @@ const COMMON_APP: Bindings = {
   toggleAutoRun: ["Mod-Shift-Enter"],
   toggleConsole: ["Mod-`"],
   clearConsole: [],
+  toggleKeepConsole: [],
   focusPreview: [],
   tabHtml: ["Alt-1"],
   tabCss: ["Alt-2"],

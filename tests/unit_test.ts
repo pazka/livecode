@@ -68,6 +68,12 @@ Deno.test("protocol: room ids", () => {
   for (const id of ids) assertEquals(id.length, 12);
 });
 
+Deno.test("settings: the console is not kept between runs unless asked", () => {
+  assertEquals(defaults().keepConsole, false);
+  assertEquals(sanitize({ keepConsole: true }).keepConsole, true);
+  assertEquals(sanitize({ keepConsole: "yes" }).keepConsole, false);
+});
+
 Deno.test("settings: sanitize keeps valid values, drops junk", () => {
   const base = defaults();
   const s = sanitize({

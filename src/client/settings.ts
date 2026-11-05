@@ -24,6 +24,8 @@ export interface Settings {
   /** Editor share of the workspace, percent. */
   split: number;
   consoleOpen: boolean;
+  /** Console output kept when the preview reloads (off by default: each run starts with an empty console). */
+  keepConsole: boolean;
   /** Errors of the JS and CSS drawn in the editors, refreshed with the preview (on by default). */
   showErrors: boolean;
   /** Files shown in the code area, in order (1 to 3, no repeats). */
@@ -86,6 +88,7 @@ export function defaults(): Settings {
     layout: "columns",
     split: 50,
     consoleOpen: false,
+    keepConsole: false,
     showErrors: true,
     panes: ["html"],
     paneSizes: { html: 1, css: 1, js: 1 },
@@ -127,6 +130,7 @@ export function sanitize(raw: unknown, base: Settings = defaults()): Settings {
     layout: r.layout === "rows" || r.layout === "columns" ? r.layout : base.layout,
     split: num(r.split, 15, 85, base.split),
     consoleOpen: typeof r.consoleOpen === "boolean" ? r.consoleOpen : base.consoleOpen,
+    keepConsole: typeof r.keepConsole === "boolean" ? r.keepConsole : base.keepConsole,
     showErrors: typeof r.showErrors === "boolean" ? r.showErrors : base.showErrors,
     panes: sanitizePanes(r.panes, base.panes),
     paneSizes: Object.fromEntries(FILES.map((f) => {
