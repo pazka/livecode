@@ -10,6 +10,16 @@ import { type FileId, FILES, isRoomId, MAX_FILE_CHARS, type Notice } from "../sh
 import { ALL_COMMANDS, APP_COMMANDS, COMMAND_BY_ID } from "./commands.ts";
 import { composeDocument } from "./compose.ts";
 import { FILE_LABELS, SharedEditor } from "./editors.ts";
+import {
+  autoDirection,
+  closePane,
+  dropPane,
+  goToPane,
+  movePane,
+  openBeside,
+  resizePair,
+  setPaneCount,
+} from "./panes.ts";
 import { ariaShortcut, displayBinding, eventStrokes } from "./keys.ts";
 import { effectiveBindings, isPlainKey, makeMatcher, type Matcher, PRESETS } from "./keymaps.ts";
 import { type ConsoleEntry, Preview, previousRunFroze } from "./preview.ts";
@@ -146,7 +156,7 @@ function startRoom(roomId: string) {
   }
 
   // --- editors + tabs ---
-  let current: FileId = "html";
+  let current: FileId = settings.get().panes[0];
   const editors = Object.fromEntries(FILES.map((f) => [
     f,
     new SharedEditor(
@@ -159,6 +169,7 @@ function startRoom(roomId: string) {
       (file, line, col) => {
         if (file === current) $("sb-pos").textContent = `Ln ${line}, Col ${col}`;
       },
+      (g) => texts[g].toString(),
     ),
   ])) as Record<FileId, SharedEditor>;
 
@@ -178,29 +189,145 @@ function startRoom(roomId: string) {
     return { keymap: s.keymap, tabSize: s.tabSize, lineWrap: s.lineWrap };
   }
 
+  // --- files: the buttons above the code, and one, two or three panes (panes.ts) ---
   const tabs = FILES.map((f) => $<HTMLButtonElement>(`tab-${f}`));
-  function selectTab(f: FileId, focusEditor: boolean) {
-    current = f;
+  const panesEl = $("panes");
+  const paneEl = (f: FileId) => $(`pane-${f}`);
+  const othersIn: Record<FileId, number> = { html: 0, css: 0, js: 0 };
+  const FILE_NAMES: Record<FileId, string> = { html: "index.html", css: "style.css", js: "script.js" };
+
+  function labelTabs() {
+    const shown = settings.get().panes;
     for (const t of tabs) {
-      const on = t.dataset.file === f;
-      t.setAttribute("aria-selected", String(on));
-      t.tabIndex = on ? 0 : -1;
-      $(`panel-${t.dataset.file}`).hidden = !on;
+      const f = t.dataset.file as FileId;
+      const n = othersIn[f];
+      t.dataset.shown = String(shown.includes(f));
+      if (f === current) t.setAttribute("aria-current", "true");
+      else t.removeAttribute("aria-current");
+      t.setAttribute(
+        "aria-label",
+        `${FILE_NAMES[f]} (${FILE_LABELS[f]})${
+          f === current ? ", editing" : shown.includes(f) ? ", shown" : ""
+        }${n ? `, ${n} ${n === 1 ? "other person" : "other people"} here` : ""}`,
+      );
     }
-    $("module-toggle").hidden = f !== "js";
-    editors[f].view.requestMeasure();
+  }
+
+  /** The file being edited: its button marked, its caret in the status bar, told to the room. */
+  function setCurrent(f: FileId) {
+    const changed = f !== current;
+    current = f;
+    labelTabs();
+    for (const g of FILES) paneEl(g).classList.toggle("current", g === f);
     const st = editors[f].view.state;
     const ln = st.doc.lineAt(st.selection.main.head);
     $("sb-pos").textContent = `Ln ${ln.number}, Col ${st.selection.main.head - ln.from + 1}`;
-    awareness.setLocalStateField("file", f);
+    if (changed || awareness.getLocalState()?.file !== f) awareness.setLocalStateField("file", f);
+  }
+
+  /** Go to a file: shown → focus it; hidden → it takes the place of the file being edited. */
+  function selectTab(f: FileId, focusEditor: boolean) {
+    const s = settings.get();
+    if (!s.panes.includes(f)) settings.update({ panes: goToPane(s.panes, current, f) });
+    setCurrent(f);
     if (focusEditor) editors[f].focus();
   }
+  function cycle(d: 1 | -1): FileId {
+    const shown = settings.get().panes;
+    const list: readonly FileId[] = shown.length > 1 ? shown : FILES;
+    return list[(list.indexOf(current) + d + list.length) % list.length];
+  }
+  function setPanes(panes: FileId[], announceIt = true) {
+    const before = settings.get().panes.join();
+    settings.update({ panes });
+    const now = settings.get().panes;
+    if (!now.includes(current)) setCurrent(now[0]);
+    if (announceIt && now.join() !== before) {
+      announce(`Showing ${now.map((f) => FILE_NAMES[f]).join(", ")}`);
+    }
+  }
+  for (const f of FILES) {
+    editors[f].view.contentDOM.addEventListener("focus", () => {
+      if (current !== f) setCurrent(f);
+    });
+  }
+
+  let effectiveDir: "row" | "column" = "row";
+  function applyPanes(s: Settings) {
+    const shown = s.panes;
+    const n = shown.length;
+    effectiveDir = s.paneDir === "auto" ? autoDirection(panesEl.clientWidth || innerWidth / 2, n) : s.paneDir;
+    panesEl.dataset.dir = effectiveDir;
+    panesEl.dataset.count = String(n);
+    for (const f of FILES) {
+      const el = paneEl(f);
+      const i = shown.indexOf(f);
+      const was = el.hidden;
+      el.hidden = i < 0;
+      el.style.order = String(i * 2);
+      el.style.flexGrow = String(n > 1 ? s.paneSizes[f] : 1);
+      if (i >= 0) {
+        const back = el.querySelector<HTMLButtonElement>("[data-act=back]")!;
+        const fwd = el.querySelector<HTMLButtonElement>("[data-act=forward]")!;
+        const [b, a] = effectiveDir === "row" ? ["left", "right"] : ["up", "down"];
+        back.disabled = i === 0;
+        fwd.disabled = i === n - 1;
+        back.setAttribute("aria-label", `Move ${FILE_NAMES[f]} ${b}`);
+        fwd.setAttribute("aria-label", `Move ${FILE_NAMES[f]} ${a}`);
+        back.title = `Move ${b}`;
+        fwd.title = `Move ${a}`;
+        if (was) editors[f].view.requestMeasure();
+      }
+    }
+    panesEl.querySelectorAll<HTMLElement>(".pane-splitter").forEach((sp, k) => {
+      sp.hidden = k >= n - 1;
+      sp.style.order = String(k * 2 + 1);
+      if (sp.hidden) return;
+      const a = shown[k], b = shown[k + 1];
+      const pct = Math.round((s.paneSizes[a] / (s.paneSizes[a] + s.paneSizes[b])) * 100);
+      sp.setAttribute("aria-orientation", effectiveDir === "row" ? "vertical" : "horizontal");
+      sp.setAttribute("aria-label", `Resize ${FILE_NAMES[a]} and ${FILE_NAMES[b]}`);
+      sp.setAttribute("aria-valuemin", "0");
+      sp.setAttribute("aria-valuemax", "100");
+      sp.setAttribute("aria-valuenow", String(pct));
+      sp.setAttribute("aria-valuetext", `${FILE_NAMES[a]} ${pct} percent`);
+    });
+    for (const b of document.querySelectorAll<HTMLButtonElement>(".pane-tools [data-count]")) {
+      b.setAttribute("aria-pressed", String(Number(b.dataset.count) === n));
+    }
+    const dirBtn = $("pane-dir");
+    const toStack = effectiveDir === "row";
+    dirBtn.setAttribute("aria-label", toStack ? "Stack the files" : "Put the files side by side");
+    dirBtn.title = dirBtn.getAttribute("aria-label")!;
+    dirBtn.hidden = n < 2;
+    dirBtn.classList.toggle("stacked", !toStack);
+    $("module-toggle").hidden = !shown.includes("js");
+    if (!shown.includes(current)) setCurrent(shown[0]);
+    else labelTabs();
+  }
+  new ResizeObserver(() => {
+    const s = settings.get();
+    if (s.paneDir === "auto" && autoDirection(panesEl.clientWidth, s.panes.length) !== effectiveDir) {
+      applyPanes(s);
+    }
+  }).observe(panesEl);
+
   $("tabs").addEventListener("click", (e) => {
-    const t = (e.target as HTMLElement).closest<HTMLButtonElement>("[role=tab]");
-    if (t) selectTab(t.dataset.file as FileId, false);
+    const t = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-file]");
+    if (!t) return;
+    const f = t.dataset.file as FileId;
+    const s = settings.get();
+    // Ctrl / Cmd / Shift + click: open beside the current file instead of in its place
+    if ((e.ctrlKey || e.metaKey || e.shiftKey) && !s.panes.includes(f)) {
+      setPanes(openBeside(s.panes, current, f));
+      setCurrent(f);
+    } else {
+      selectTab(f, false);
+    }
   });
   $("tabs").addEventListener("keydown", (e) => {
-    const i = FILES.indexOf(current);
+    const i = tabs.indexOf(document.activeElement as HTMLButtonElement);
+    if (i < 0) return;
     const next = e.key === "ArrowRight"
       ? (i + 1) % FILES.length
       : e.key === "ArrowLeft"
@@ -212,8 +339,144 @@ function startRoom(roomId: string) {
       : -1;
     if (next < 0) return;
     e.preventDefault();
-    selectTab(FILES[next], false);
+    // with one file shown the arrows switch files (like tabs); with several they only move between buttons
+    if (settings.get().panes.length === 1) selectTab(FILES[next], false);
+    for (const t of tabs) t.tabIndex = -1;
+    tabs[next].tabIndex = 0;
     tabs[next].focus();
+  });
+  tabs.forEach((t, i) => (t.tabIndex = i === 0 ? 0 : -1));
+
+  document.querySelector(".pane-tools")!.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
+    if (!b) return;
+    if (b.id === "pane-dir") return app.paneDirection();
+    setPanes(setPaneCount(settings.get().panes, current, Number(b.dataset.count)));
+  });
+  panesEl.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>(".pane-head [data-act]");
+    if (!b) return;
+    const f = b.closest<HTMLElement>(".pane")!.dataset.file as FileId;
+    const s = settings.get();
+    const act = b.dataset.act;
+    if (act === "close") setPanes(closePane(s.panes, f));
+    else if (act === "only") {
+      setCurrent(f);
+      setPanes([f]);
+    } else setPanes(movePane(s.panes, f, act === "back" ? -1 : 1));
+    // keep the keyboard where it was when the button disappears or goes disabled
+    if (!b.isConnected || b.disabled || b.closest<HTMLElement>(".pane")!.hidden) editors[current].focus();
+  });
+
+  // drag a file button or a pane's title bar onto a pane: placed before / after it (by the pointer's half)
+  const DRAG_TYPE = "application/x-livecode-file";
+  let dragFile: FileId | null = null;
+  const clearDrop = () =>
+    panesEl.querySelectorAll(".drop-before, .drop-after").forEach((el) =>
+      el.classList.remove("drop-before", "drop-after")
+    );
+  function onDragStart(e: DragEvent, f: FileId) {
+    dragFile = f;
+    e.dataTransfer?.setData(DRAG_TYPE, f);
+    e.dataTransfer?.setData("text/plain", FILE_NAMES[f]);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  }
+  for (const t of tabs) t.addEventListener("dragstart", (e) => onDragStart(e, t.dataset.file as FileId));
+  for (const f of FILES) {
+    paneEl(f).querySelector<HTMLElement>(".pane-head")!.addEventListener(
+      "dragstart",
+      (e) => onDragStart(e, f),
+    );
+  }
+  const dropTarget = (e: DragEvent): { f: FileId; after: boolean } | null => {
+    const pane = e.target instanceof Element ? e.target.closest<HTMLElement>(".pane") : null;
+    if (!pane || pane.hidden) return null;
+    const r = pane.getBoundingClientRect();
+    const after = effectiveDir === "row"
+      ? e.clientX > r.left + r.width / 2
+      : e.clientY > r.top + r.height / 2;
+    return { f: pane.dataset.file as FileId, after };
+  };
+  panesEl.addEventListener("dragover", (e) => {
+    if (!dragFile) return;
+    const t = dropTarget(e);
+    clearDrop();
+    if (!t || t.f === dragFile) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    paneEl(t.f).classList.add(t.after ? "drop-after" : "drop-before");
+  });
+  panesEl.addEventListener("dragleave", (e) => {
+    if (!panesEl.contains(e.relatedTarget as Node | null)) clearDrop();
+  });
+  panesEl.addEventListener("drop", (e) => {
+    const t = dropTarget(e);
+    clearDrop();
+    if (!dragFile || !t) return;
+    e.preventDefault();
+    const f = dragFile;
+    dragFile = null;
+    setPanes(dropPane(settings.get().panes, f, t.f, t.after));
+    setCurrent(f);
+    editors[f].focus();
+  });
+  document.addEventListener("dragend", () => {
+    dragFile = null;
+    clearDrop();
+  });
+
+  // the line between two panes: drag, or arrow keys (Shift = bigger steps), Home / End
+  panesEl.querySelectorAll<HTMLElement>(".pane-splitter").forEach((sp, k) => {
+    const pair = () => {
+      const shown = settings.get().panes;
+      return [shown[k], shown[k + 1]] as const;
+    };
+    let live: Record<FileId, number> | null = null;
+    sp.addEventListener("pointerdown", (e) => {
+      live = { ...settings.get().paneSizes };
+      sp.setPointerCapture(e.pointerId);
+      document.body.style.userSelect = "none";
+    });
+    sp.addEventListener("pointermove", (e) => {
+      if (!live) return;
+      const [a, b] = pair();
+      const ra = paneEl(a).getBoundingClientRect(), rb = paneEl(b).getBoundingClientRect();
+      const row = effectiveDir === "row";
+      const start = row ? ra.left : ra.top, end = row ? rb.right : rb.bottom;
+      live = resizePair(live, a, b, ((row ? e.clientX : e.clientY) - start) / Math.max(1, end - start));
+      paneEl(a).style.flexGrow = String(live[a]);
+      paneEl(b).style.flexGrow = String(live[b]);
+    });
+    sp.addEventListener("pointerup", (e) => {
+      if (!live) return;
+      sp.releasePointerCapture(e.pointerId);
+      document.body.style.userSelect = "";
+      const sizes = live;
+      live = null;
+      settings.update({ paneSizes: sizes });
+    });
+    sp.addEventListener("keydown", (e) => {
+      const [a, b] = pair();
+      const sizes = settings.get().paneSizes;
+      const frac = sizes[a] / (sizes[a] + sizes[b]);
+      const step = e.shiftKey ? 0.15 : 0.05;
+      const v = e.key === "ArrowLeft" || e.key === "ArrowUp"
+        ? frac - step
+        : e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? frac + step
+        : e.key === "Home"
+        ? 0
+        : e.key === "End"
+        ? 1
+        : null;
+      if (v === null) return;
+      e.preventDefault();
+      settings.update({ paneSizes: resizePair(sizes, a, b, v) });
+    });
+    sp.addEventListener("dblclick", () => {
+      const [a, b] = pair();
+      settings.update({ paneSizes: resizePair(settings.get().paneSizes, a, b, 0.5) });
+    });
   });
 
   // shared "run as module" switch (room-wide)
@@ -323,7 +586,6 @@ function startRoom(roomId: string) {
   // --- people ---
   const names = new Map<number, string>();
   const peersEl = $("peers");
-  const FILE_NAMES: Record<FileId, string> = { html: "index.html", css: "style.css", js: "script.js" };
   const initials = (name: string) =>
     name.trim().split(/\s+/).slice(0, 2).map((w) => [...w][0] ?? "").join("").toUpperCase() || "?";
   const MAX_AVATARS = 7;
@@ -376,17 +638,12 @@ function startRoom(roomId: string) {
       ));
     }
     peersEl.replaceChildren(...items);
-    for (const t of tabs) {
-      const f = t.dataset.file as FileId;
-      t.querySelector(".dots")!.replaceChildren(...dots[f]);
-      const n = dots[f].length;
-      t.setAttribute(
-        "aria-label",
-        `${FILE_NAMES[f]} (${FILE_LABELS[f]})${
-          n ? `, ${n} ${n === 1 ? "other person" : "other people"} here` : ""
-        }`,
-      );
+    for (const f of FILES) {
+      $(`tab-${f}`).querySelector(".dots")!.replaceChildren(...dots[f]);
+      paneEl(f).querySelector(".pane-head .dots")!.replaceChildren(...dots[f].map((d) => d.cloneNode()));
+      othersIn[f] = dots[f].length;
     }
+    labelTabs();
     renderStatus();
   }
   awareness.on("change", (ch: { added: number[]; removed: number[] }, origin: unknown) => {
@@ -426,7 +683,8 @@ function startRoom(roomId: string) {
     awareness.setLocalStateField("user", { name: s.name, color: s.color, colorLight: `${s.color}55` });
   }
   setUser(settings.get());
-  selectTab("html", false);
+  applyPanes(settings.get());
+  setCurrent(settings.get().panes[0]);
 
   // --- layout: split + orientation ---
   const ws = $("workspace");
@@ -510,9 +768,28 @@ function startRoom(roomId: string) {
     tabHtml: () => selectTab("html", true),
     tabCss: () => selectTab("css", true),
     tabJs: () => selectTab("js", true),
-    nextTab: () => selectTab(FILES[(FILES.indexOf(current) + 1) % FILES.length], true),
-    prevTab: () => selectTab(FILES[(FILES.indexOf(current) + FILES.length - 1) % FILES.length], true),
+    // several files shown: next / previous go through them in their order; one shown: through all files
+    nextTab: () => selectTab(cycle(1), true),
+    prevTab: () => selectTab(cycle(-1), true),
     focusEditor: () => editors[current].focus(),
+    paneOnly: () => setPanes([current]),
+    paneSplit: () => {
+      const next = openBeside(settings.get().panes, current);
+      const added = next.find((f) => !settings.get().panes.includes(f));
+      setPanes(next);
+      if (added) selectTab(added, true);
+    },
+    paneAll: () => setPanes(setPaneCount(settings.get().panes, current, 3)),
+    paneClose: () => {
+      setPanes(closePane(settings.get().panes, current));
+      editors[current].focus();
+    },
+    paneMoveBack: () => setPanes(movePane(settings.get().panes, current, -1)),
+    paneMoveForward: () => setPanes(movePane(settings.get().panes, current, 1)),
+    paneDirection: () => {
+      settings.update({ paneDir: effectiveDir === "row" ? "column" : "row" });
+      announce(effectiveDir === "row" ? "Files side by side" : "Files stacked");
+    },
     nextPane: () => {
       const regions = focusRegions();
       const a = document.activeElement;
@@ -792,6 +1069,7 @@ function startRoom(roomId: string) {
   function applyAll(s: Settings, prev?: Settings) {
     applyTheme(s);
     applyLayout(s);
+    applyPanes(s);
     bindings = effectiveBindings(s.keymap, s.overrides[s.keymap]);
     matcher = makeMatcher(bindings);
     labelButtons();

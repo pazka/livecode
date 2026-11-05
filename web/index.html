@@ -85,22 +85,86 @@
   <main id="workspace" class="workspace" data-layout="columns">
     <section id="editor-area" class="island editor-island" aria-label="Code" tabindex="-1">
       <div class="island-head">
-        <div role="tablist" aria-label="Files" id="tabs" class="tabs">
-          <button role="tab" id="tab-html" aria-controls="panel-html" data-file="html"><span class="ft ft-html"
-              aria-hidden="true">&lt;/&gt;</span>index.html<span class="dots" aria-hidden="true"></span></button>
-          <button role="tab" id="tab-css" aria-controls="panel-css" data-file="css"><span class="ft ft-css"
-              aria-hidden="true">#</span>style.css<span class="dots" aria-hidden="true"></span></button>
-          <button role="tab" id="tab-js" aria-controls="panel-js" data-file="js"><span class="ft ft-js"
-              aria-hidden="true">JS</span>script.js<span class="dots" aria-hidden="true"></span></button>
+        <div role="toolbar" aria-label="Files (drag one onto the code to place it)" id="tabs" class="tabs">
+          <button type="button" id="tab-html" aria-controls="pane-html" data-file="html" draggable="true"><span
+              class="ft ft-html" aria-hidden="true">&lt;/&gt;</span>index.html<span class="dots" aria-hidden="true"></span></button>
+          <button type="button" id="tab-css" aria-controls="pane-css" data-file="css" draggable="true"><span
+              class="ft ft-css" aria-hidden="true">#</span>style.css<span class="dots" aria-hidden="true"></span></button>
+          <button type="button" id="tab-js" aria-controls="pane-js" data-file="js" draggable="true"><span
+              class="ft ft-js" aria-hidden="true">JS</span>script.js<span class="dots" aria-hidden="true"></span></button>
         </div>
         <span class="spacer"></span>
         <label class="switch small" id="module-toggle" hidden title="Shared with the room">
           <input type="checkbox" id="js-module" role="switch"><span class="track" aria-hidden="true"></span><span>ES module</span>
         </label>
+        <div class="pane-tools" role="group" aria-label="Files shown">
+          <button type="button" class="icon-btn" data-count="1" aria-label="Show one file"><svg class="i"
+              viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/></svg></button>
+          <button type="button" class="icon-btn" data-count="2" aria-label="Show two files"><svg class="i"
+              viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path
+                d="M8 2.5v11"/></svg></button>
+          <button type="button" class="icon-btn" data-count="3" aria-label="Show all three files"><svg class="i"
+              viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path
+                d="M6 2.5v11M10 2.5v11"/></svg></button>
+          <button type="button" class="icon-btn" id="pane-dir" aria-label="Stack the files"><svg class="i"
+              viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5.5h10M3 10.5h10M11 3.5l2 2-2 2M5 8.5l-2 2 2 2"/></svg></button>
+        </div>
       </div>
-      <div role="tabpanel" id="panel-html" aria-labelledby="tab-html" class="panel"></div>
-      <div role="tabpanel" id="panel-css" aria-labelledby="tab-css" class="panel" hidden></div>
-      <div role="tabpanel" id="panel-js" aria-labelledby="tab-js" class="panel" hidden></div>
+      <div id="panes" class="panes" data-dir="row" data-count="1">
+        <section class="pane" id="pane-html" data-file="html" aria-labelledby="pane-title-html">
+          <div class="pane-head" draggable="true" title="Drag to move index.html">
+            <span class="ft ft-html" aria-hidden="true">&lt;/&gt;</span><span class="pane-title" id="pane-title-html">index.html</span><span
+              class="dots" aria-hidden="true"></span>
+            <span class="spacer"></span>
+            <button type="button" class="icon-btn small" data-act="back" aria-label="Move index.html back"><svg class="i"
+                viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg></button>
+            <button type="button" class="icon-btn small" data-act="forward" aria-label="Move index.html forward"><svg class="i"
+                viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg></button>
+            <button type="button" class="icon-btn small" data-act="only" aria-label="Show only index.html"
+              title="Show only this file"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5"
+                  width="11" height="11" rx="1.5"/></svg></button>
+            <button type="button" class="icon-btn small" data-act="close" aria-label="Hide index.html" title="Hide this file"><svg
+                class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>
+          </div>
+          <div id="panel-html" class="panel" role="region" aria-label="HTML code"></div>
+        </section>
+        <section class="pane" id="pane-css" data-file="css" aria-labelledby="pane-title-css">
+          <div class="pane-head" draggable="true" title="Drag to move style.css">
+            <span class="ft ft-css" aria-hidden="true">#</span><span class="pane-title" id="pane-title-css">style.css</span><span
+              class="dots" aria-hidden="true"></span>
+            <span class="spacer"></span>
+            <button type="button" class="icon-btn small" data-act="back" aria-label="Move style.css back"><svg class="i"
+                viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg></button>
+            <button type="button" class="icon-btn small" data-act="forward" aria-label="Move style.css forward"><svg class="i"
+                viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg></button>
+            <button type="button" class="icon-btn small" data-act="only" aria-label="Show only style.css"
+              title="Show only this file"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5"
+                  width="11" height="11" rx="1.5"/></svg></button>
+            <button type="button" class="icon-btn small" data-act="close" aria-label="Hide style.css" title="Hide this file"><svg
+                class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>
+          </div>
+          <div id="panel-css" class="panel" role="region" aria-label="CSS code"></div>
+        </section>
+        <section class="pane" id="pane-js" data-file="js" aria-labelledby="pane-title-js">
+          <div class="pane-head" draggable="true" title="Drag to move script.js">
+            <span class="ft ft-js" aria-hidden="true">JS</span><span class="pane-title" id="pane-title-js">script.js</span><span
+              class="dots" aria-hidden="true"></span>
+            <span class="spacer"></span>
+            <button type="button" class="icon-btn small" data-act="back" aria-label="Move script.js back"><svg class="i"
+                viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg></button>
+            <button type="button" class="icon-btn small" data-act="forward" aria-label="Move script.js forward"><svg class="i"
+                viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg></button>
+            <button type="button" class="icon-btn small" data-act="only" aria-label="Show only script.js"
+              title="Show only this file"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5"
+                  width="11" height="11" rx="1.5"/></svg></button>
+            <button type="button" class="icon-btn small" data-act="close" aria-label="Hide script.js" title="Hide this file"><svg
+                class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>
+          </div>
+          <div id="panel-js" class="panel" role="region" aria-label="JavaScript code"></div>
+        </section>
+        <div class="pane-splitter" role="separator" tabindex="0" data-i="0" hidden></div>
+        <div class="pane-splitter" role="separator" tabindex="0" data-i="1" hidden></div>
+      </div>
       <p id="editor-help" class="sr-only">Press Escape then Tab to leave the editor. Open the command list for every
         shortcut.</p>
     </section>
@@ -183,6 +247,9 @@
           <div class="field"><label for="set-layout">Layout</label>
             <select id="set-layout"><option value="columns">Side by side</option><option value="rows">Stacked</option>
             </select></div>
+          <div class="field"><label for="set-panedir">Files shown together in the code area</label>
+            <select id="set-panedir"><option value="auto">Automatic (side by side when there is room)</option>
+              <option value="row">Side by side</option><option value="column">Stacked</option></select></div>
         </fieldset>
 
         <fieldset id="sec-editor" role="tabpanel" aria-labelledby="st-editor" hidden>
@@ -248,7 +315,10 @@
       <li><kbd>Tab</kbd> indents inside the editor. To leave it, press <kbd>Esc</kbd> then <kbd>Tab</kbd> (or toggle
         “Tab moves focus”).</li>
       <li><kbd>F6</kbd> moves between the toolbar, the editor, the preview and the console.</li>
-      <li>File tabs, the size handle and the colour-scheme switch use the arrow keys.</li>
+      <li>File buttons and the size handles use the arrow keys. Show one, two or three files with the buttons
+        next to the files; drag a file (or a pane's title) to move it, drag the line between panes to resize.</li>
+      <li>While suggestions are shown, <kbd>Tab</kbd> or <kbd>Enter</kbd> takes the highlighted one. In HTML, type
+        a tag name (<code>div</code>, <code>ul.menu</code>, <code>section#top</code>) at the start of a line.</li>
       <li>A face in the toolbar jumps to that person's cursor. The status bar switches keymap and theme in one
         click.</li>
     </ul>

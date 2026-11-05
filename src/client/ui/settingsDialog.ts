@@ -159,6 +159,8 @@ export class SettingsDialog {
     wrap.addEventListener("change", () => s.update({ lineWrap: wrap.checked }));
     const layout = $<HTMLSelectElement>("set-layout");
     layout.addEventListener("change", () => s.update({ layout: layout.value as "columns" | "rows" }));
+    const paneDir = $<HTMLSelectElement>("set-panedir");
+    paneDir.addEventListener("change", () => s.update({ paneDir: paneDir.value as Settings["paneDir"] }));
     const vimrc = $<HTMLTextAreaElement>("set-vimrc");
     vimrc.addEventListener("change", () => s.update({ vimrc: vimrc.value }));
 
@@ -227,6 +229,7 @@ export class SettingsDialog {
     set("set-tab", String(v.tabSize));
     set("set-delay", String(v.previewDelay));
     set("set-layout", v.layout);
+    set("set-panedir", v.paneDir);
     set("set-vimrc", v.vimrc);
     $<HTMLInputElement>("set-wrap").checked = v.lineWrap;
     $("vimrc-field").hidden = v.keymap !== "vim";

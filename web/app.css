@@ -463,17 +463,18 @@ textarea { font-family: var(--mono); width: 100%; }
   background: var(--panel); border-bottom: 1px solid var(--border);
 }
 .tabs { display: flex; align-self: stretch; }
-.tabs [role="tab"] {
+.tabs button {
   position: relative; border: 0; border-radius: 0; background: transparent; padding: 0 0.85rem; min-height: 2.5rem;
   color: var(--muted); gap: 0.45rem; font-size: 0.92em;
 }
-.tabs [role="tab"]:hover { color: var(--fg); background: var(--hover); }
-.tabs [role="tab"][aria-selected="true"] { color: var(--fg); font-weight: 600; }
-.tabs [role="tab"][aria-selected="true"]::after {
+.tabs button:hover { color: var(--fg); background: var(--hover); }
+.tabs button[data-shown="true"] { color: var(--fg); }
+.tabs button[aria-current="true"] { color: var(--fg); font-weight: 600; }
+.tabs button[aria-current="true"]::after {
   content: ""; position: absolute; left: 0.5rem; right: 0.5rem; bottom: 0; height: 2px; border-radius: 2px 2px 0 0;
   background: var(--accent);
 }
-:root[data-theme^="hc-"] .tabs [role="tab"][aria-selected="true"]::after { background: var(--focus); height: 3px; }
+:root[data-theme^="hc-"] .tabs button[aria-current="true"]::after { background: var(--focus); height: 3px; }
 .ft {
   display: inline-grid; place-items: center; min-width: 1.4rem; height: 1.15rem; padding: 0 0.2rem; border-radius: 4px;
   font: 700 0.62rem/1 var(--mono); border: 1px solid currentColor;
@@ -481,10 +482,48 @@ textarea { font-family: var(--mono); width: 100%; }
 .ft-html { color: var(--tok-attr); }
 .ft-css { color: var(--tok-number); }
 .ft-js { color: var(--tok-func); }
-.tabs .dots { display: inline-flex; gap: 2px; }
-.tabs .dots i { width: 0.45rem; height: 0.45rem; border-radius: 50%; display: inline-block; }
+.tabs .dots, .pane-head .dots { display: inline-flex; gap: 2px; }
+.tabs .dots i, .pane-head .dots i { width: 0.45rem; height: 0.45rem; border-radius: 50%; display: inline-block; }
 .panel { flex: 1; min-height: 0; overflow: hidden; }
 .panel .cm-editor { height: 100%; }
+
+/* one, two or three files at once (panes.ts): order and sizes set by main.ts (CSS order, flex-grow) */
+.pane-tools { display: flex; align-items: center; gap: 1px; padding-left: 0.3rem; margin-left: 0.2rem;
+  border-left: 1px solid var(--border); }
+.pane-tools .icon-btn { width: 1.75rem; height: 1.75rem; }
+#pane-dir.stacked .i { transform: rotate(90deg); }
+.panes { flex: 1; display: flex; min-height: 0; min-width: 0; }
+.panes[data-dir="column"] { flex-direction: column; }
+.pane { position: relative; display: flex; flex-direction: column; flex: 1 1 0; min-width: 7rem; min-height: 4.5rem;
+  overflow: hidden; }
+.pane-head {
+  display: none; align-items: center; gap: 0.4rem; min-height: 1.9rem; padding: 0 0.25rem 0 0.6rem;
+  background: var(--panel); border-bottom: 1px solid var(--border); color: var(--muted); font-size: 0.85em;
+  cursor: grab; user-select: none;
+}
+.panes:not([data-count="1"]) .pane-head { display: flex; }
+.pane.current .pane-head { color: var(--fg); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+:root[data-theme^="hc-"] .pane.current .pane-head { box-shadow: inset 0 -3px 0 var(--focus); }
+.pane-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-head .icon-btn { width: 1.6rem; height: 1.6rem; color: var(--muted); }
+.pane-head .icon-btn:hover { color: var(--fg); }
+.pane-head .icon-btn:disabled { opacity: 0.35; cursor: default; background: transparent; }
+.pane-head .icon-btn .i { width: 14px; height: 14px; }
+.panes[data-dir="column"] .pane-head [data-act="back"] .i,
+.panes[data-dir="column"] .pane-head [data-act="forward"] .i { transform: rotate(90deg); }
+.pane-splitter { flex: 0 0 5px; position: relative; cursor: col-resize; background: var(--border);
+  background-clip: content-box; padding: 0 2px; }
+.panes[data-dir="column"] .pane-splitter { cursor: row-resize; padding: 2px 0; }
+.pane-splitter:hover, .pane-splitter:focus-visible { background-color: var(--accent); }
+.pane-splitter:focus-visible { outline: 2px solid var(--focus); outline-offset: -1px; }
+/* where a dragged file lands */
+.pane.drop-before::after, .pane.drop-after::after {
+  content: ""; position: absolute; z-index: 5; pointer-events: none; background: var(--accent); opacity: 0.85;
+}
+.panes[data-dir="row"] .pane.drop-before::after { left: 0; top: 0; bottom: 0; width: 4px; }
+.panes[data-dir="row"] .pane.drop-after::after { right: 0; top: 0; bottom: 0; width: 4px; }
+.panes[data-dir="column"] .pane.drop-before::after { left: 0; right: 0; top: 0; height: 4px; }
+.panes[data-dir="column"] .pane.drop-after::after { left: 0; right: 0; bottom: 0; height: 4px; }
 
 .urlbar {
   display: flex; align-items: center; gap: 0.45rem; min-width: 0; flex: 0 1 auto;
@@ -618,7 +657,8 @@ legend { font-weight: 700; font-size: 1.15rem; padding: 0.6rem 0 0.4rem; }
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
 @media (forced-colors: active) {
-  .tabs [role="tab"][aria-selected="true"]::after { background: Highlight; }
-  .avatar, .tabs .dots i, .status::before, .project-badge { forced-color-adjust: none; }
+  .tabs button[aria-current="true"]::after { background: Highlight; }
+  .pane-splitter, .pane.drop-before::after, .pane.drop-after::after { background: CanvasText; }
+  .avatar, .tabs .dots i, .pane-head .dots i, .status::before, .project-badge { forced-color-adjust: none; }
   .glass, .island { border: 1px solid CanvasText; }
 }

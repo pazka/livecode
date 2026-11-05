@@ -1,6 +1,7 @@
 // Per-person settings, kept in this browser only (localStorage). Nothing here is shared with the room except
 // the name and colour, which travel in the awareness state.
 
+import { type FileId, FILES } from "../shared/protocol.ts";
 import { type Bindings, isPresetId, type PresetId } from "./keymaps.ts";
 import { isThemeChoice, PEER_COLORS } from "./themes.ts";
 
@@ -23,6 +24,22 @@ export interface Settings {
   /** Editor share of the workspace, percent. */
   split: number;
   consoleOpen: boolean;
+  /** Files shown in the code area, in order (1 to 3, no repeats). */
+  panes: FileId[];
+  /** Relative size of each file's pane (flex weight) when several are shown. */
+  paneSizes: Record<FileId, number>;
+  /** Panes side by side (row), stacked (column), or chosen from the code area's shape (auto). */
+  paneDir: "auto" | "row" | "column";
+}
+
+export const PANE_MIN = 0.15;
+export const PANE_MAX = 6;
+
+/** Visible files: known ids, no repeats, at least one. */
+export function sanitizePanes(v: unknown, base: FileId[]): FileId[] {
+  if (!Array.isArray(v)) return base;
+  const out = [...new Set(v.filter((f): f is FileId => (FILES as readonly unknown[]).includes(f)))];
+  return out.length ? out : base;
 }
 
 const KEY = "livecode.settings.v1";
@@ -67,6 +84,9 @@ export function defaults(): Settings {
     layout: "columns",
     split: 50,
     consoleOpen: false,
+    panes: ["html"],
+    paneSizes: { html: 1, css: 1, js: 1 },
+    paneDir: "auto",
   };
 }
 
@@ -104,6 +124,15 @@ export function sanitize(raw: unknown, base: Settings = defaults()): Settings {
     layout: r.layout === "rows" || r.layout === "columns" ? r.layout : base.layout,
     split: num(r.split, 15, 85, base.split),
     consoleOpen: typeof r.consoleOpen === "boolean" ? r.consoleOpen : base.consoleOpen,
+    panes: sanitizePanes(r.panes, base.panes),
+    paneSizes: Object.fromEntries(FILES.map((f) => {
+      const sizes = (r.paneSizes && typeof r.paneSizes === "object" ? r.paneSizes : {}) as Record<
+        string,
+        unknown
+      >;
+      return [f, num(sizes[f], PANE_MIN, PANE_MAX, base.paneSizes[f] ?? 1)];
+    })) as Record<FileId, number>,
+    paneDir: r.paneDir === "row" || r.paneDir === "column" || r.paneDir === "auto" ? r.paneDir : base.paneDir,
   };
 }
 
