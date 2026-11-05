@@ -45,6 +45,7 @@ import type { Awareness } from "y-protocols/awareness";
 import { type FileId, MAX_FILE_CHARS } from "../shared/protocol.ts";
 import { extraCompletions, type FileTexts } from "./completions.ts";
 import { type CaretPoint, crowdedCarets } from "./cursors.ts";
+import { errorDisplay } from "./diagnostics.ts";
 import { fallbackKeymap, PRESET_BY_ID, type PresetId } from "./keymaps.ts";
 import { editorTheme, highlightStyle } from "./themes.ts";
 
@@ -188,6 +189,7 @@ export class SharedEditor {
         this.wrap.of(opts.lineWrap ? EditorView.lineWrapping : []),
         yCollab(ytext, awareness, { undoManager: false }),
         crowdedNames,
+        errorDisplay,
         remoteNotInHistory,
         fileLimit(() => onLimit(file)),
         EditorView.updateListener.of((u) => {

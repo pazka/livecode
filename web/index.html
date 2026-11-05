@@ -56,6 +56,7 @@
         <button type="button" id="copy-link" class="icon-btn" aria-label="Copy the room link">
           <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.8 2.8 0 014 4l-1 1M9 11.5l-1 1a2.8 2.8 0 01-4-4l1-1"/></svg>
         </button>
+        <span id="copy-pop" class="popover" aria-hidden="true" hidden>Copied to clipboard</span>
       </div>
     </div>
     <div class="tb-group tb-center">
@@ -87,11 +88,11 @@
       <div class="island-head">
         <div role="toolbar" aria-label="Files (drag one onto the code to place it)" id="tabs" class="tabs">
           <button type="button" id="tab-html" aria-controls="pane-html" data-file="html" draggable="true"><span
-              class="ft ft-html" aria-hidden="true">&lt;/&gt;</span>index.html<span class="dots" aria-hidden="true"></span></button>
+              class="ft ft-html" aria-hidden="true">&lt;/&gt;</span>index.html<span class="dots" aria-hidden="true"></span><span class="errs" aria-hidden="true" hidden></span></button>
           <button type="button" id="tab-css" aria-controls="pane-css" data-file="css" draggable="true"><span
-              class="ft ft-css" aria-hidden="true">#</span>style.css<span class="dots" aria-hidden="true"></span></button>
+              class="ft ft-css" aria-hidden="true">#</span>style.css<span class="dots" aria-hidden="true"></span><span class="errs" aria-hidden="true" hidden></span></button>
           <button type="button" id="tab-js" aria-controls="pane-js" data-file="js" draggable="true"><span
-              class="ft ft-js" aria-hidden="true">JS</span>script.js<span class="dots" aria-hidden="true"></span></button>
+              class="ft ft-js" aria-hidden="true">JS</span>script.js<span class="dots" aria-hidden="true"></span><span class="errs" aria-hidden="true" hidden></span></button>
         </div>
         <span class="spacer"></span>
         <label class="switch small" id="module-toggle" hidden title="Shared with the room">
@@ -257,10 +258,14 @@
           <div class="field"><label for="set-tab">Indent width</label>
             <input id="set-tab" type="number" min="1" max="8" step="1"> spaces</div>
           <div class="field"><label class="toggle"><input id="set-wrap" type="checkbox"> Wrap long lines</label></div>
+          <div class="field"><label class="toggle"><input id="set-errors" type="checkbox" aria-describedby="errors-hint">
+              Show errors in the JavaScript and CSS code</label>
+            <p id="errors-hint" class="hint">Syntax errors and the script's uncaught errors are marked on their line,
+              refreshed together with the preview (after the delay below).</p></div>
           <div class="field"><label for="set-delay">Preview refresh delay after typing</label>
             <input id="set-delay" type="number" min="100" max="5000" step="50" aria-describedby="delay-hint"> ms
-            <p id="delay-hint" class="hint">The preview waits this long after the last keystroke (yours or anyone's)
-              before refreshing.</p></div>
+            <p id="delay-hint" class="hint">The preview — and the errors shown in the code — wait this long after the
+              last keystroke (yours or anyone's) before refreshing.</p></div>
         </fieldset>
 
         <fieldset id="keyboard-fieldset" role="tabpanel" aria-labelledby="st-keyboard" hidden>

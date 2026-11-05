@@ -4,6 +4,7 @@
 // fragment is left to the browser exactly like a file with that content would be (no doctype = quirks
 // mode, implied html/head/body), so what the preview shows is what a browser tab shows.
 
+import { javascriptLanguage } from "@codemirror/lang-javascript";
 import { guardLoops } from "./loopguard.ts";
 
 export interface Sources {
@@ -47,7 +48,10 @@ export const RUNTIME = `(() => {
       post({ type: "console", level: "error", text: "Failed to load " + (e.target.src || e.target.href || e.target.tagName.toLowerCase()) });
       return;
     }
-    post({ type: "console", level: "error", text: clip((e.message || "Error") + where(e.filename, e.lineno)) });
+    // a syntax error of the script comes through document.write: drop that wrapper from the message
+    const msg = String(e.message || "Error").replace("Failed to execute 'write' on 'Document': ", "");
+    post({ type: "console", level: "error", text: clip(msg + where(e.filename, e.lineno)) });
+    if (e.lineno) post({ type: "jserror", file: String(e.filename || ""), line: e.lineno, col: e.colno || 0, text: clip(msg.replace(/^Uncaught /, "")) });
   }, true);
   addEventListener("unhandledrejection", (e) => post({ type: "console", level: "error", text: clip("Unhandled promise rejection: " + fmt(e.reason)) }));
   let last = performance.now(), n = 0, tripped = false;
@@ -59,6 +63,7 @@ export const RUNTIME = `(() => {
     if (performance.now() - last > 1500) {
       tripped = true;
       post({ type: "console", level: "error", text: "Loop stopped after 1.5 s without a break (JS line " + line + "). Fix the loop condition; the page keeps running." });
+      post({ type: "jserror", file: "${JS_SOURCE_URL}", line: line, col: 0, text: "Loop stopped after 1.5 s without a break" });
       return true;
     }
     return false;
@@ -107,4 +112,41 @@ export function composeDocument(src: Sources, opts: { guard?: boolean } = {}): s
     html = end >= 0 ? html.slice(0, end) + script + html.slice(end) : html + script;
   }
   return html;
+}
+
+/** The user's script inside a composed document: its text and the document line it starts on. */
+function scriptOf(html: string): { text: string; firstLine: number } | null {
+  const end = html.lastIndexOf(`\n//# sourceURL=${JS_SOURCE_URL}\n</script>`);
+  if (end < 0) return null;
+  const open = html.lastIndexOf("<script", end);
+  const start = html.indexOf(">", open) + 1;
+  if (open < 0 || start <= 0) return null;
+  return { text: html.slice(start, end), firstLine: html.slice(0, start).split("\n").length };
+}
+
+/**
+ * The user's script line for an error the page reported against the document (not the script's own URL),
+ * or null when it is not the script's. Browsers differ: a line of the whole document, or — for a syntax
+ * error that stops the parse before the script's name is read — a line of the script itself (only taken
+ * when the script really does not parse, so an error of a <script> in the HTML is never moved here).
+ */
+export function scriptLine(html: string, docLine: number, message = ""): number | null {
+  const s = scriptOf(html);
+  if (!s) return null;
+  const lines = s.text.split("\n").length;
+  const l = docLine - s.firstLine + 1;
+  if (l >= 1 && l <= lines) return l;
+  if (/SyntaxError/.test(message) && docLine <= lines && !parses(s.text)) return docLine;
+  return null;
+}
+
+function parses(js: string): boolean {
+  let ok = true;
+  javascriptLanguage.parser.parse(js).iterate({
+    enter: (n) => {
+      if (n.type.isError) ok = false;
+      return ok;
+    },
+  });
+  return ok;
 }
