@@ -9,6 +9,7 @@ import { Vim } from "@replit/codemirror-vim";
 import { type FileId, FILES, isRoomId, MAX_FILE_CHARS, type Notice } from "../shared/protocol.ts";
 import { ALL_COMMANDS, APP_COMMANDS, COMMAND_BY_ID } from "./commands.ts";
 import { composeDocument } from "./compose.ts";
+import { addShownErrors, type CodeError, cssErrors, errorCount, showErrors } from "./diagnostics.ts";
 import { FILE_LABELS, SharedEditor } from "./editors.ts";
 import {
   autoDirection,
@@ -201,6 +202,10 @@ function startRoom(roomId: string) {
     for (const t of tabs) {
       const f = t.dataset.file as FileId;
       const n = othersIn[f];
+      const errs = errorCount(editors[f].view.state);
+      const badge = t.querySelector<HTMLElement>(".errs")!;
+      badge.hidden = errs === 0;
+      badge.textContent = String(errs);
       t.dataset.shown = String(shown.includes(f));
       if (f === current) t.setAttribute("aria-current", "true");
       else t.removeAttribute("aria-current");
@@ -208,7 +213,9 @@ function startRoom(roomId: string) {
         "aria-label",
         `${FILE_NAMES[f]} (${FILE_LABELS[f]})${
           f === current ? ", editing" : shown.includes(f) ? ", shown" : ""
-        }${n ? `, ${n} ${n === 1 ? "other person" : "other people"} here` : ""}`,
+        }${n ? `, ${n} ${n === 1 ? "other person" : "other people"} here` : ""}${
+          errs ? `, ${errs} ${errs === 1 ? "error" : "errors"}` : ""
+        }`,
       );
     }
   }
@@ -499,12 +506,63 @@ function startRoom(roomId: string) {
       jsModule: meta.get("jsModule") === true,
     }), {
     console: (e) => addConsole(e),
+    started: () => (pendingJsErrors = []),
+    pageError: (e, pending) => {
+      const err: CodeError = { line: e.line, col: e.col || undefined, message: e.text };
+      if (pending) pendingJsErrors.push(err);
+      else if (collectingJs) shownJsErrors.push(err);
+      else if (settings.get().showErrors) {
+        addShownErrors(editors.js.view, [err]);
+        errorsChanged();
+      }
+    },
     rendered: () => {
       renders++;
       lastRenderAt = Date.now();
       setPreviewStatus();
+      refreshErrors();
     },
   });
+
+  // --- errors in the code (diagnostics.ts), refreshed with the preview ---
+  // JS: what the new version reports while it starts (collected for a moment, so a persistent error does not
+  // blink off and on at each refresh), then anything it reports later (a click handler throwing …).
+  let pendingJsErrors: CodeError[] = [];
+  let shownJsErrors: CodeError[] = [];
+  let collectingJs = false;
+  let collectTimer: number | undefined;
+  const lastCounts: Record<FileId, number> = { html: 0, css: 0, js: 0 };
+  function refreshErrors() {
+    if (!settings.get().showErrors) return clearErrors();
+    showErrors(editors.css.view, cssErrors(texts.css.toString()));
+    collectingJs = true;
+    shownJsErrors = pendingJsErrors;
+    pendingJsErrors = [];
+    clearTimeout(collectTimer);
+    collectTimer = setTimeout(() => {
+      collectingJs = false;
+      showErrors(editors.js.view, shownJsErrors);
+      errorsChanged();
+    }, 300);
+    errorsChanged();
+  }
+  function clearErrors() {
+    clearTimeout(collectTimer);
+    collectingJs = false;
+    for (const f of ["css", "js"] as const) showErrors(editors[f].view, []);
+    errorsChanged();
+  }
+  function errorsChanged() {
+    labelTabs();
+    const said: string[] = [];
+    for (const f of ["css", "js"] as const) {
+      const n = errorCount(editors[f].view.state);
+      if (n && n !== lastCounts[f]) said.push(`${FILE_LABELS[f]}: ${n} ${n === 1 ? "error" : "errors"}`);
+      if (!n && lastCounts[f]) said.push(`${FILE_LABELS[f]}: no errors`);
+      lastCounts[f] = n;
+    }
+    if (said.length) announce(said.join(", "));
+  }
   doc.on("update", () => {
     const s = settings.get();
     if (s.autoRun && !previewPaused) preview.schedule(s.previewDelay);
@@ -818,8 +876,14 @@ function startRoom(roomId: string) {
     fontReset: () => settings.update({ fontSize: 14 }),
     copyLink: () => {
       navigator.clipboard.writeText(location.href).then(
-        () => announce("Room link copied"),
-        () => announce("Copy failed: the link is in the address bar"),
+        () => {
+          popover("Copied to clipboard", false);
+          announce("Room link copied to the clipboard");
+        },
+        () => {
+          popover("Copy failed — the link is in the address bar", true);
+          announce("Copy failed: the link is in the address bar");
+        },
       );
     },
     newRoom: () => (location.href = "/new"),
@@ -843,6 +907,16 @@ function startRoom(roomId: string) {
   }
 
   $("copy-link").addEventListener("click", app.copyLink);
+  let popTimer: number | undefined;
+  /** A short note under the copy button (screen readers get the same words through announce). */
+  function popover(text: string, fail: boolean) {
+    const p = $("copy-pop");
+    p.textContent = text;
+    p.classList.toggle("fail", fail);
+    p.hidden = false;
+    clearTimeout(popTimer);
+    popTimer = setTimeout(() => (p.hidden = true), 1800);
+  }
   $("palette-btn").addEventListener("click", () => palette.open());
   $("settings-btn").addEventListener("click", () => dialog.open());
   $("help-btn").addEventListener("click", app.help);
@@ -1080,6 +1154,10 @@ function startRoom(roomId: string) {
     if (!prev || prev.name !== s.name || prev.color !== s.color) setUser(s);
     if (prev && prev.vimrc !== s.vimrc) applyVimrc(s.vimrc);
     if (prev && !prev.autoRun && s.autoRun && !previewPaused) preview.render(false);
+    if (prev && prev.showErrors !== s.showErrors) {
+      if (s.showErrors) preview.render(true); // the script's errors come from running it
+      else clearErrors();
+    }
     setPreviewStatus();
   }
   settings.subscribe(applyAll);

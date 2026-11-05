@@ -128,6 +128,23 @@ export const editorTheme = EditorView.theme({
     top: "-1.35em",
     transitionDelay: "0s",
   },
+  // errors (diagnostics.ts): wavy underline, a bar on the line, the message at the end of the line
+  ".cm-lc-error": {
+    textDecoration: "underline wavy var(--danger)",
+    textDecorationSkipInk: "none",
+    textUnderlineOffset: "3px",
+  },
+  // a bar at the line's start, not a background: a line background would hide the selection behind it
+  ".cm-lc-errorLine": { boxShadow: "inset 3px 0 0 var(--danger)" },
+  ".cm-lc-errorMsg": {
+    marginLeft: "1.5em",
+    color: "var(--danger)",
+    fontStyle: "italic",
+    fontFamily: "var(--ui-font)",
+    fontSize: "0.9em",
+    whiteSpace: "pre",
+    userSelect: "none",
+  },
   // carets close together (cursors.ts): no name chips piled on the text, the name shows on hover
   ".cm-ySelectionCaret.cm-yCrowded > .cm-ySelectionInfo": { opacity: "0", pointerEvents: "none" },
   ".cm-ySelectionCaret.cm-yCrowded:hover > .cm-ySelectionInfo": { opacity: "1" },

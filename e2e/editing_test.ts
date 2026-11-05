@@ -595,6 +595,58 @@ Deno.test({
           "one pane",
         );
       });
+      await check(
+        "errors: a JS syntax error is marked on its line after the refresh, gone once fixed",
+        async () => {
+          await reset(a!, "js", "const a = 1;\nconst b = ;\n");
+          await a!.click("#run-btn"); // auto-refresh is off in this suite: errors follow the refresh
+          const line =
+            `[...document.querySelectorAll("#panel-js .cm-lc-errorLine")].map((l) => l.textContent).join("|")`;
+          await expectTrue(a!, `${line}.includes("const b = ;")`, "error on line 2", 5000);
+          await expectTrue(
+            a!,
+            `!!document.querySelector("#tab-js .errs:not([hidden])")`,
+            "count on the file button",
+          );
+          await hook(a!).setText("js", "const a = 1;\nconst b = 2;\n");
+          await a!.click("#run-btn");
+          await expectTrue(a!, `!document.querySelector("#panel-js .cm-lc-errorLine")`, "cleared", 5000);
+        },
+      );
+      await check("errors: an uncaught JS error (TypeError) is marked on its line", async () => {
+        await reset(a!, "js", "let x = null;\nx.go();\n");
+        await a!.click("#run-btn");
+        await expectTrue(
+          a!,
+          `[...document.querySelectorAll("#panel-js .cm-lc-errorLine")].some((l) => l.textContent.includes("x.go()"))`,
+          "error on line 2",
+          8000,
+        );
+        await hook(a!).setText("js", "");
+        await a!.click("#run-btn");
+      });
+      await check("errors: a CSS missing ; is marked with a plain message", async () => {
+        await reset(a!, "css", "p {\n  color: red\n  margin: 0;\n}\n");
+        await a!.click("#run-btn");
+        await expectTrue(
+          a!,
+          `[...document.querySelectorAll("#panel-css .cm-lc-errorMsg")].some((m) => m.textContent.includes("Missing ;"))`,
+          "message shown",
+          8000,
+        );
+        await hook(a!).setText("css", "");
+        await a!.click("#run-btn");
+        await expectTrue(a!, `!document.querySelector("#panel-css .cm-lc-errorLine")`, "cleared", 5000);
+      });
+      await check("copy link: a popover says it was copied", async () => {
+        await a!.click("#copy-link");
+        await expectTrue(
+          a!,
+          `!document.getElementById("copy-pop").hidden && document.getElementById("copy-pop").textContent.includes("Copied")`,
+          "popover",
+        );
+        await expectTrue(a!, `document.getElementById("copy-pop").hidden`, "goes away", 4000);
+      });
       await check("typing: every ASCII symbol reaches the editor", async () => {
         await reset(a!, "js", "");
         const bad: string[] = [];
@@ -803,7 +855,11 @@ Deno.test({
       });
 
       await check("no page errors in either browser", () => {
-        const real = [...new Set(errors.filter((e) => !e.includes("favicon")))];
+        // the "errors:" checks make the previewed page fail on purpose (a syntax error, a TypeError)
+        const planted = [/Unexpected token ';'/, /reading 'go'/];
+        const real = [
+          ...new Set(errors.filter((e) => !e.includes("favicon") && !planted.some((r) => r.test(e)))),
+        ];
         if (real.length) throw new Error(real.slice(0, 12).join(" | "));
       });
     } finally {

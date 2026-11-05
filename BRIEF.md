@@ -52,6 +52,12 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
    moved by dragging its title bar or a file button (or the ‹ › buttons), hidden with ×, "only this" with □;
    Ctrl/Cmd/Shift+click on a hidden file opens it beside; commands "Open another file beside" (VS Code
    Ctrl+\\), "Show all three files", "Show only the current file" … in the palette.
+11. **Errors in the code** (per person, on by default — Settings → Editor): the script's syntax errors and
+   uncaught exceptions (as the browser reports them when the preview runs it) and the stylesheet's syntax
+   errors (plain messages: missing `;` or `:`, `{` never closed, `}` too many) are marked on their line with
+   the message at the line's end and a count on the file button. They refresh with the preview, i.e. after
+   the person's own refresh delay (100–5000 ms), or on Run when auto-refresh is off.
+12. Copying the room link shows a short "Copied to clipboard" note under the button.
 
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,

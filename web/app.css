@@ -406,6 +406,21 @@ textarea { font-family: var(--mono); width: 100%; }
   display: inline-flex; align-items: center; gap: 0.45rem; min-width: 0; padding: 0.15rem 0.15rem 0.15rem 0.35rem;
   border-radius: var(--r); background: var(--hover);
 }
+.project { position: relative; }
+/* "Copied to clipboard" under the copy button */
+.popover {
+  position: absolute; top: calc(100% + 8px); right: -0.25rem; z-index: 50; padding: 0.3rem 0.65rem;
+  border-radius: var(--r); background: var(--fg); color: var(--bg); font-size: 0.85rem; font-weight: 600;
+  white-space: nowrap; pointer-events: none; box-shadow: 0 6px 18px -8px var(--shadow);
+  animation: pop-in 0.15s var(--ease);
+}
+.popover::before {
+  content: ""; position: absolute; bottom: 100%; right: 0.85rem; border: 6px solid transparent;
+  border-bottom-color: var(--fg);
+}
+.popover.fail { background: var(--danger); color: var(--bg); }
+.popover.fail::before { border-bottom-color: var(--danger); }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-3px); } }
 .project-badge {
   width: 1.35rem; height: 1.35rem; border-radius: 5px; flex: none;
   background: linear-gradient(135deg, var(--accent), var(--tok-func));
@@ -482,6 +497,8 @@ textarea { font-family: var(--mono); width: 100%; }
 .ft-html { color: var(--tok-attr); }
 .ft-css { color: var(--tok-number); }
 .ft-js { color: var(--tok-func); }
+.tabs .errs { min-width: 1.1rem; height: 1.1rem; padding: 0 0.25rem; border-radius: 999px; font: 700 0.68rem/1.1rem var(--ui-font);
+  text-align: center; background: var(--danger); color: var(--bg); }
 .tabs .dots, .pane-head .dots { display: inline-flex; gap: 2px; }
 .tabs .dots i, .pane-head .dots i { width: 0.45rem; height: 0.45rem; border-radius: 50%; display: inline-block; }
 .panel { flex: 1; min-height: 0; overflow: hidden; }
@@ -659,6 +676,7 @@ legend { font-weight: 700; font-size: 1.15rem; padding: 0.6rem 0 0.4rem; }
 @media (forced-colors: active) {
   .tabs button[aria-current="true"]::after { background: Highlight; }
   .pane-splitter, .pane.drop-before::after, .pane.drop-after::after { background: CanvasText; }
+  .popover, .tabs .errs { border: 1px solid CanvasText; }
   .avatar, .tabs .dots i, .pane-head .dots i, .status::before, .project-badge { forced-color-adjust: none; }
   .glass, .island { border: 1px solid CanvasText; }
 }

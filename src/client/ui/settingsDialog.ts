@@ -157,6 +157,8 @@ export class SettingsDialog {
     num("set-delay", "previewDelay");
     const wrap = $<HTMLInputElement>("set-wrap");
     wrap.addEventListener("change", () => s.update({ lineWrap: wrap.checked }));
+    const errs = $<HTMLInputElement>("set-errors");
+    errs.addEventListener("change", () => s.update({ showErrors: errs.checked }));
     const layout = $<HTMLSelectElement>("set-layout");
     layout.addEventListener("change", () => s.update({ layout: layout.value as "columns" | "rows" }));
     const paneDir = $<HTMLSelectElement>("set-panedir");
@@ -232,6 +234,7 @@ export class SettingsDialog {
     set("set-panedir", v.paneDir);
     set("set-vimrc", v.vimrc);
     $<HTMLInputElement>("set-wrap").checked = v.lineWrap;
+    $<HTMLInputElement>("set-errors").checked = v.showErrors;
     $("vimrc-field").hidden = v.keymap !== "vim";
     for (const b of $("set-color").querySelectorAll<HTMLButtonElement>("[data-color]")) {
       const on = b.dataset.color === v.color;
