@@ -234,8 +234,14 @@ Deno.test({
       await new Promise((r) => setTimeout(r, 500));
       const ctxC = await browser.newContext();
       const c = await ctxC.newPage();
+      const cErrors: string[] = [];
+      c.on("pageerror", (e) => cErrors.push(`C: ${e.message} ${e.stack ?? ""}`.slice(0, 1500)));
+      c.on("console", (m) => m.type() === "error" && cErrors.push(`C console: ${m.text()}`.slice(0, 1500)));
       await c.goto(roomUrl);
-      await c.waitForFunction(() => (globalThis as any).__livecode?.ready === true);
+      await c.waitForFunction(() => (globalThis as any).__livecode?.ready === true, null, { timeout: 15_000 })
+        .catch((e) => {
+          throw new Error(`a new visitor never got ready: ${cErrors.join(" | ") || "no page error"} (${e})`);
+        });
       assert((await c.evaluate(() => (globalThis as any).__livecode.text("html"))).includes("Hello from A"));
       await ctxC.close();
 
