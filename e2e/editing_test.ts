@@ -520,6 +520,81 @@ Deno.test({
         await a!.keyboard.press("Enter");
         await expectText(a!, "js", "const longName = 1;\nlongName");
       });
+      await check("completion: Tab accepts the suggestion (no tab inserted)", async () => {
+        await reset(a!, "js", "const longName = 1;\n");
+        await a!.keyboard.press("Control+End");
+        await a!.keyboard.type("longN");
+        await a!.waitForSelector("#panel-js .cm-tooltip-autocomplete", { timeout: 3000 });
+        await a!.keyboard.press("Tab");
+        await expectText(a!, "js", "const longName = 1;\nlongName");
+      });
+      await check("completion: Tab still indents when no suggestion is shown", async () => {
+        await reset(a!, "js", "x");
+        await a!.keyboard.press("Tab");
+        await expectText(a!, "js", (t) => /^\s+x$/.test(t), "indented");
+      });
+      await check(
+        "completion: browser functions in JS (document.getElementBy… → getElementById)",
+        async () => {
+          await reset(a!, "js", "");
+          await a!.keyboard.type("document.getElementByI");
+          await a!.waitForSelector("#panel-js .cm-tooltip-autocomplete", { timeout: 3000 });
+          await a!.keyboard.press("Tab");
+          await expectText(a!, "js", "document.getElementById");
+        },
+      );
+      await check("completion: HTML tag from a word (div + Tab → <div></div>, caret inside)", async () => {
+        await reset(a!, "html", "");
+        await a!.keyboard.type("div");
+        await a!.waitForSelector("#panel-html .cm-tooltip-autocomplete", { timeout: 3000 });
+        await a!.keyboard.press("Tab");
+        await a!.keyboard.type("in");
+        await expectText(a!, "html", "<div>in</div>");
+      });
+      await check("completion: HTML abbreviation with a class (ul.menu)", async () => {
+        await reset(a!, "html", "");
+        await a!.keyboard.type("ul.menu");
+        await a!.waitForSelector("#panel-html .cm-tooltip-autocomplete", { timeout: 3000 });
+        await a!.keyboard.press("Tab");
+        await expectText(a!, "html", (t) => /^<ul class="menu">\n\s+<li><\/li>\n<\/ul>$/.test(t), "ul.menu");
+      });
+      await check("panes: all three files side by side, then back to one", async () => {
+        await reset(a!, "html", PAGE);
+        await a!.click(".pane-tools [data-count='3']");
+        await expectTrue(
+          a!,
+          `["html", "css", "js"].every((f) => !document.getElementById("pane-" + f).hidden)`,
+          "three panes",
+        );
+        const boxes = await a!.evaluate(() =>
+          ["html", "css", "js"].map((f) =>
+            document.getElementById("pane-" + f)!.getBoundingClientRect().width
+          )
+        );
+        if (boxes.some((w) => w < 60)) throw new Error(`pane widths ${boxes.join(", ")}`);
+        // typing in the CSS pane edits CSS while the others stay shown
+        await a!.click("#panel-css .cm-content", { position: { x: 3, y: 8 } });
+        await expectTrue(
+          a!,
+          `document.querySelector("#tab-css").getAttribute("aria-current") === "true"`,
+          "CSS current",
+        );
+        // move CSS first, hide it, back to one file
+        await a!.click("#pane-css [data-act=back]");
+        await expectTrue(
+          a!,
+          `getComputedStyle(document.getElementById("pane-css")).order === "0"`,
+          "CSS moved first",
+        );
+        await a!.click("#pane-css [data-act=close]");
+        await expectTrue(a!, `document.getElementById("pane-css").hidden`, "CSS hidden");
+        await a!.click(".pane-tools [data-count='1']");
+        await expectTrue(
+          a!,
+          `["html", "css", "js"].filter((f) => !document.getElementById("pane-" + f).hidden).length === 1`,
+          "one pane",
+        );
+      });
       await check("typing: every ASCII symbol reaches the editor", async () => {
         await reset(a!, "js", "");
         const bad: string[] = [];
@@ -589,19 +664,19 @@ Deno.test({
         await a!.keyboard.press("Alt+Digit2");
         await expectTrue(
           a!,
-          `document.querySelector("#tab-css").getAttribute("aria-selected") === "true"`,
+          `["aria-current", "aria-selected"].some((a) => document.querySelector("#tab-css").getAttribute(a) === "true")`,
           "CSS",
         );
         await a!.keyboard.press("Alt+Digit3");
         await expectTrue(
           a!,
-          `document.querySelector("#tab-js").getAttribute("aria-selected") === "true"`,
+          `["aria-current", "aria-selected"].some((a) => document.querySelector("#tab-js").getAttribute(a) === "true")`,
           "JS",
         );
         await a!.keyboard.press("Alt+Digit1");
         await expectTrue(
           a!,
-          `document.querySelector("#tab-html").getAttribute("aria-selected") === "true"`,
+          `["aria-current", "aria-selected"].some((a) => document.querySelector("#tab-html").getAttribute(a) === "true")`,
           "HTML",
         );
       });

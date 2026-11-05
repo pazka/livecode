@@ -39,6 +39,19 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
    F6 cycles toolbar → editor → preview → console, Escape then Tab leaves the editor (or toggle "Tab moves
    focus"), joins/leaves and status announced politely, `aria-keyshortcuts` on buttons, reduced motion.
 7. Per-person settings stay in the browser (localStorage); only name + colour are shared.
+8. **Completions** (owner, 2026-11-05): CSS as the package gives it, plus `.` / `#` selectors from the page's
+   classes and ids; JavaScript: the browser's own globals and members (`document.`, `Math.` …), every word
+   already written in the script, the page's classes / ids inside `querySelector("…")`, `getElementById("…")`,
+   `classList.add("…")`; HTML: a tag name at the start of a line becomes the element (`div`, `ul.menu`,
+   `section#top.hero`), `class="…"` / `id="…"` complete from the stylesheet. **Tab takes the highlighted
+   suggestion** (Enter too); with no list open Tab indents as before.
+9. **Name chips of remote cursors** are hidden where carets crowd (another caret — or yours — within 8
+   characters on the same line); hovering the caret shows the name.
+10. **One, two or three files at once** in the code area (per person): the 1 / 2 / 3 buttons, side by side or
+   stacked (automatic by width, or chosen), each pane resizable (drag or arrow keys on the line between),
+   moved by dragging its title bar or a file button (or the ‹ › buttons), hidden with ×, "only this" with □;
+   Ctrl/Cmd/Shift+click on a hidden file opens it beside; commands "Open another file beside" (VS Code
+   Ctrl+\\), "Show all three files", "Show only the current file" … in the palette.
 
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,

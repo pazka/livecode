@@ -110,6 +110,22 @@ Deno.test({
       );
       await b.waitForSelector("#panel-html .cm-ySelectionCaret", { timeout: 5_000 });
       await shot(b, "03-room-remote-cursor");
+      // A's name chip is shown while B is far away, hidden once B's caret is within 8 characters of it
+      const crowded = () =>
+        b.evaluate(() =>
+          document.querySelector("#panel-html .cm-ySelectionCaret")!.classList.contains("cm-yCrowded")
+        );
+      await b.click("#panel-html .cm-content");
+      await b.keyboard.press("Control+Home");
+      await new Promise((r) => setTimeout(r, 300));
+      assertEquals(await crowded(), false, "far apart: A's name shows");
+      await b.keyboard.press("Control+End");
+      await b.keyboard.press("ArrowLeft");
+      await b.waitForFunction(
+        () => document.querySelector("#panel-html .cm-ySelectionCaret")?.classList.contains("cm-yCrowded"),
+        null,
+        { timeout: 5_000 },
+      );
 
       // the JS file runs in the preview; console output reaches the console panel
       await b.evaluate(() =>
