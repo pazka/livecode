@@ -390,8 +390,12 @@ export const browserScopeSource: CompletionSource = (() => {
   };
 })();
 
-/** The extra completion sources of a file (as language data: they run where that language is active). */
-export function extraCompletions(file: FileId, texts: FileTexts): Extension {
+/**
+ * The extra completion sources of a file (as language data: they run where that language is active). A
+ * TypeScript script gets its globals, members and words from the TypeScript service (ts/client.ts) instead;
+ * the page's classes and ids in selector strings stay.
+ */
+export function extraCompletions(file: FileId, texts: FileTexts, script: "js" | "ts" = "js"): Extension {
   const names = pageNames(texts);
   if (file === "html") {
     return [
@@ -400,6 +404,7 @@ export function extraCompletions(file: FileId, texts: FileTexts): Extension {
     ];
   }
   if (file === "css") return cssLanguage.data.of({ autocomplete: cssSelectorSource(names) });
+  if (script === "ts") return javascriptLanguage.data.of({ autocomplete: jsSelectorStringSource(names) });
   return [
     javascriptLanguage.data.of({ autocomplete: browserScopeSource }),
     javascriptLanguage.data.of({ autocomplete: jsWordSource }),

@@ -35,7 +35,7 @@ import {
 import { highlightSelectionMatches, search } from "@codemirror/search";
 import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
-import { javascript } from "@codemirror/lang-javascript";
+import { javascript, javascriptLanguage } from "@codemirror/lang-javascript";
 import { vim } from "@replit/codemirror-vim";
 import { emacs } from "@replit/codemirror-emacs";
 import "./vendor/emacs-commands.js"; // the package's keys + commands, which minifying drops (see file)
@@ -48,11 +48,46 @@ import { type CaretPoint, crowdedCarets } from "./cursors.ts";
 import { errorDisplay } from "./diagnostics.ts";
 import { fallbackKeymap, PRESET_BY_ID, type PresetId } from "./keymaps.ts";
 import { editorTheme, highlightStyle } from "./themes.ts";
+import { tsClient, tsCompletionSource, typescriptEditor, typescriptSupport } from "./ts/client.ts";
 
+/** The script's language, shared by the room (meta "jsLang"). */
+export type ScriptLang = "js" | "ts";
+
+/** What each file is called; the script's entries follow the room's language (setScriptNames). */
 export const FILE_LABELS: Record<FileId, string> = { html: "HTML", css: "CSS", js: "JavaScript" };
+export const FILE_NAMES: Record<FileId, string> = { html: "index.html", css: "style.css", js: "script.js" };
 
-const language = (f: FileId): Extension =>
-  f === "html" ? html({ autoCloseTags: true }) : f === "css" ? css() : javascript();
+export function setScriptNames(lang: ScriptLang) {
+  FILE_LABELS.js = lang === "ts" ? "TypeScript" : "JavaScript";
+  FILE_NAMES.js = lang === "ts" ? "script.ts" : "script.js";
+}
+
+/** The file's language, its extra completions and (TypeScript) the types under the mouse. */
+function languageExtension(f: FileId, lang: ScriptLang, texts: FileTexts): Extension {
+  const ts = f === "js" && lang === "ts";
+  return [
+    f === "html"
+      ? html({ autoCloseTags: true })
+      : f === "css"
+      ? css()
+      : ts
+      ? typescriptSupport()
+      : javascript(),
+    extraCompletions(f, texts, ts ? "ts" : "js"),
+    ts
+      ? [
+        javascriptLanguage.data.of({ autocomplete: tsCompletionSource(tsClient()) }),
+        typescriptEditor(tsClient()),
+      ]
+      : [],
+    EditorView.contentAttributes.of({
+      "aria-label": `${
+        f === "js" ? (ts ? "TypeScript" : "JavaScript") : FILE_LABELS[f]
+      } code, shared with the room`,
+      "aria-describedby": "editor-help",
+    }),
+  ];
+}
 
 /** `cm-hasSelection` on the editor while any range is non-empty (themes.ts: the caret line steps aside). */
 const selectionClass = EditorView.editorAttributes.compute(
@@ -142,11 +177,18 @@ export interface EditorOptions {
   lineWrap: boolean;
 }
 
+export interface FileOptions {
+  /** The script's language (the room's switch); other files ignore it. */
+  scriptLang?: ScriptLang;
+}
+
 export class SharedEditor {
   readonly view: EditorView;
   private readonly modal = new Compartment();
   private readonly tabs = new Compartment();
   private readonly wrap = new Compartment();
+  private readonly lang = new Compartment();
+  private scriptLang: ScriptLang;
 
   constructor(
     readonly file: FileId,
@@ -156,8 +198,10 @@ export class SharedEditor {
     opts: EditorOptions,
     onLimit: (file: FileId) => void = () => {},
     onCursor: (file: FileId, line: number, col: number) => void = () => {},
-    texts: FileTexts = (f) => (f === file ? ytext.toString() : ""),
+    private readonly texts: FileTexts = (f) => (f === file ? ytext.toString() : ""),
+    fileOpts: FileOptions = {},
   ) {
+    this.scriptLang = fileOpts.scriptLang ?? "js";
     const state = EditorState.create({
       doc: ytext.toString(),
       extensions: [
@@ -183,8 +227,7 @@ export class SharedEditor {
         highlightSelectionMatches(),
         search({ top: true }),
         keymap.of(fallbackKeymap()),
-        language(file),
-        extraCompletions(file, texts),
+        this.lang.of(languageExtension(file, this.scriptLang, texts)),
         this.tabs.of(tabExtension(opts.tabSize)),
         this.wrap.of(opts.lineWrap ? EditorView.lineWrapping : []),
         yCollab(ytext, awareness, { undoManager: false }),
@@ -199,10 +242,6 @@ export class SharedEditor {
           onCursor(file, line.number, head - line.from + 1);
         }),
         editorTheme,
-        EditorView.contentAttributes.of({
-          "aria-label": `${FILE_LABELS[file]} code, shared with the room`,
-          "aria-describedby": "editor-help",
-        }),
       ],
     });
     this.view = new EditorView({ state, parent });
@@ -216,6 +255,13 @@ export class SharedEditor {
         this.wrap.reconfigure(opts.lineWrap ? EditorView.lineWrapping : []),
       ],
     });
+  }
+
+  /** The script follows the room's JavaScript / TypeScript switch (highlighting, completions, types). */
+  setScriptLang(lang: ScriptLang) {
+    if (this.file !== "js" || lang === this.scriptLang) return;
+    this.scriptLang = lang;
+    this.view.dispatch({ effects: this.lang.reconfigure(languageExtension(this.file, lang, this.texts)) });
   }
 
   focus() {

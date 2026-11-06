@@ -9,7 +9,8 @@ import { type Conn, encodeNotice, type Room, type RoomManager } from "./rooms.ts
 
 export interface Asset {
   type: string;
-  body: Uint8Array<ArrayBuffer>;
+  /** Absent for a large asset kept gzipped only (the TypeScript worker): inflated for the rare client without gzip. */
+  body?: Uint8Array<ArrayBuffer>;
   gzip?: Uint8Array<ArrayBuffer>;
   /** Long-lived cache for fingerprinted files; html is always revalidated. */
   immutable: boolean;
@@ -24,7 +25,7 @@ export const CSP = [
   "font-src 'self'",
   "connect-src 'self'",
   "frame-src 'self'",
-  "worker-src 'none'",
+  "worker-src 'self'", // the TypeScript worker (/ts-worker.js)
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'self'",
@@ -89,7 +90,9 @@ function serveAsset(req: Request, a: Asset, headers: Record<string, string>, hea
   };
   const gz = a.gzip && /\bgzip\b/.test(req.headers.get("accept-encoding") ?? "");
   if (gz) h["content-encoding"] = "gzip";
-  return respond(gz ? a.gzip! : a.body, 200, h, head);
+  if (gz || a.body) return respond(gz ? a.gzip! : a.body!, 200, h, head);
+  const inflated = new Blob([a.gzip!]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return respond(inflated, 200, h, head);
 }
 
 export interface Deps {

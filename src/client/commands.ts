@@ -36,6 +36,8 @@ import {
 import { foldAll, foldCode, indentRange, unfoldAll, unfoldCode } from "@codemirror/language";
 import { startCompletion } from "@codemirror/autocomplete";
 import type { Command as CMCommand } from "@codemirror/view";
+import { showTypeAtCursor } from "./ts/client.ts";
+import { announce } from "./ui/dom.ts";
 
 /**
  * Format: with a selection, re-indent the selected lines; without one, the whole file — every line
@@ -100,6 +102,12 @@ export const EDITOR_COMMANDS: EditorCommand[] = [
   ed("indentLess", "Outdent", "Edit", indentLess),
   ed("reindent", "Format file (or re-indent the selection)", "Edit", formatCode),
   ed("startCompletion", "Show completions", "Edit", startCompletion),
+  ed(
+    "showType",
+    "Show the type at the cursor (TypeScript)",
+    "Edit",
+    (view) => showTypeAtCursor(view, announce),
+  ),
   ed("selectAll", "Select all", "Selection", selectAll),
   ed("selectLine", "Select line", "Selection", selectLine),
   ed("selectNextOccurrence", "Add next occurrence to selection", "Selection", selectNextOccurrence),
@@ -130,7 +138,8 @@ export const APP_COMMANDS: AppCommand[] = [
   app("focusPreview", "Focus the preview", "Preview"),
   app("tabHtml", "Edit HTML", "Files"),
   app("tabCss", "Edit CSS", "Files"),
-  app("tabJs", "Edit JavaScript", "Files"),
+  app("tabJs", "Edit the script", "Files"),
+  app("toggleTypeScript", "Script language: TypeScript / JavaScript (shared with the room)", "Files"),
   app("nextTab", "Next file", "Files"),
   app("prevTab", "Previous file", "Files"),
   app("focusEditor", "Focus the editor", "Files"),

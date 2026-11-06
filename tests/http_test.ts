@@ -16,7 +16,13 @@ Deno.test({
       await home.text();
       const csp = home.headers.get("content-security-policy") ?? "";
       for (
-        const d of ["default-src 'self'", "script-src 'self'", "frame-ancestors 'none'", "object-src 'none'"]
+        const d of [
+          "default-src 'self'",
+          "script-src 'self'",
+          "frame-ancestors 'none'",
+          "object-src 'none'",
+          "worker-src 'self'", // the TypeScript worker, from this site only
+        ]
       ) {
         assert(csp.includes(d), `CSP lacks ${d}: ${csp}`);
       }
@@ -40,6 +46,12 @@ Deno.test({
       await js.body?.cancel();
       assertEquals(js.status, 200);
       assertMatch(js.headers.get("cache-control") ?? "", /immutable/);
+
+      const tsw = await fetch(`${srv.base}/ts-worker.js?v=abc123`);
+      await tsw.body?.cancel();
+      assertEquals(tsw.status, 200);
+      assertMatch(tsw.headers.get("content-type") ?? "", /^text\/javascript/);
+      assertMatch(tsw.headers.get("cache-control") ?? "", /immutable/);
 
       const post = await fetch(`${srv.base}/`, { method: "POST", body: "x" });
       await post.body?.cancel();

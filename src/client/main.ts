@@ -10,7 +10,7 @@ import { type FileId, FILES, isRoomId, MAX_FILE_CHARS, type Notice } from "../sh
 import { ALL_COMMANDS, APP_COMMANDS, COMMAND_BY_ID } from "./commands.ts";
 import { composeDocument } from "./compose.ts";
 import { addShownErrors, type CodeError, cssErrors, errorCount, showErrors } from "./diagnostics.ts";
-import { FILE_LABELS, SharedEditor } from "./editors.ts";
+import { FILE_LABELS, FILE_NAMES, type ScriptLang, setScriptNames, SharedEditor } from "./editors.ts";
 import {
   autoDirection,
   closePane,
@@ -23,13 +23,15 @@ import {
 } from "./panes.ts";
 import { ariaShortcut, displayBinding, eventStrokes } from "./keys.ts";
 import { effectiveBindings, isPlainKey, makeMatcher, type Matcher, PRESETS } from "./keymaps.ts";
-import { type ConsoleEntry, Preview, previousRunFroze } from "./preview.ts";
+import { type Built, type ConsoleEntry, Preview, previousRunFroze } from "./preview.ts";
 import { RoomProvider, type Status } from "./provider.ts";
 import { type Settings, SettingsStore } from "./settings.ts";
 import { resolveTheme, THEME_CHOICES, THEMES } from "./themes.ts";
 import { $, announce, h } from "./ui/dom.ts";
 import { Palette, type PaletteItem } from "./ui/palette.ts";
 import { SettingsDialog } from "./ui/settingsDialog.ts";
+import { tsClient } from "./ts/client.ts";
+import { sourceLookup } from "./ts/sourcemap.ts";
 
 const settings = new SettingsStore();
 
@@ -112,6 +114,8 @@ function startRoom(roomId: string) {
   const doc = new Y.Doc();
   const texts = Object.fromEntries(FILES.map((f) => [f, doc.getText(f)])) as Record<FileId, Y.Text>;
   const meta = doc.getMap<unknown>("meta");
+  /** The script's language, room-wide (the TypeScript switch). */
+  const scriptLang = (): ScriptLang => (meta.get("jsLang") === "ts" ? "ts" : "js");
   const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/${roomId}`;
 
   let previewPaused = previousRunFroze() || new URLSearchParams(location.search).has("norun");
@@ -124,7 +128,7 @@ function startRoom(roomId: string) {
     status: (s) => renderStatus(s),
     synced: () => {
       hook.ready = true;
-      syncModuleToggle();
+      syncScriptMeta();
       if (!previewPaused) preview.render(true);
       else setPreviewStatus();
     },
@@ -195,7 +199,6 @@ function startRoom(roomId: string) {
   const panesEl = $("panes");
   const paneEl = (f: FileId) => $(`pane-${f}`);
   const othersIn: Record<FileId, number> = { html: 0, css: 0, js: 0 };
-  const FILE_NAMES: Record<FileId, string> = { html: "index.html", css: "style.css", js: "script.js" };
 
   function labelTabs() {
     const shown = settings.get().panes;
@@ -309,6 +312,7 @@ function startRoom(roomId: string) {
     dirBtn.hidden = n < 2;
     dirBtn.classList.toggle("stacked", !toStack);
     $("module-toggle").hidden = !shown.includes("js");
+    $("ts-toggle").hidden = !shown.includes("js");
     if (!shown.includes(current)) setCurrent(shown[0]);
     else labelTabs();
   }
@@ -486,25 +490,62 @@ function startRoom(roomId: string) {
     });
   });
 
-  // shared "run as module" switch (room-wide)
+  // shared "run as module" and "TypeScript" switches (room-wide)
   const moduleBox = $<HTMLInputElement>("js-module");
-  function syncModuleToggle() {
+  const tsBox = $<HTMLInputElement>("js-ts");
+  let shownLang: ScriptLang = "js";
+  function syncScriptMeta() {
     moduleBox.checked = meta.get("jsModule") === true;
+    const lang = scriptLang();
+    tsBox.checked = lang === "ts";
+    if (lang === shownLang) return;
+    shownLang = lang;
+    setScriptNames(lang);
+    editors.js.setScriptLang(lang);
+    if (lang === "ts") tsClient().start().catch(() => {}); // load the compiler before it is needed
+    nameScript();
+    applyPanes(settings.get());
+    refreshTypeErrors();
+    announce(`The script is now ${FILE_LABELS.js} (${FILE_NAMES.js})`);
+  }
+  /** The script's file name and labels where index.html wrote "script.js". */
+  function nameScript() {
+    const name = FILE_NAMES.js;
+    const icon = scriptLang() === "ts" ? "TS" : "JS";
+    for (const el of document.querySelectorAll<HTMLElement>("#tab-js .ft, #pane-js .ft")) {
+      el.textContent = icon;
+    }
+    $("tab-js").querySelector(".fname")!.textContent = name;
+    $("pane-title-js").textContent = name;
+    paneEl("js").querySelector<HTMLElement>(".pane-head")!.title = `Drag to move ${name}`;
+    paneEl("js").querySelector("[data-act=only]")!.setAttribute("aria-label", `Show only ${name}`);
+    paneEl("js").querySelector("[data-act=close]")!.setAttribute("aria-label", `Hide ${name}`);
+    $("panel-js").setAttribute("aria-label", `${FILE_LABELS.js} code`);
   }
   moduleBox.addEventListener("change", () => meta.set("jsModule", moduleBox.checked));
-  meta.observe(syncModuleToggle);
+  tsBox.addEventListener("change", () => meta.set("jsLang", tsBox.checked ? "ts" : "js"));
+  meta.observe(syncScriptMeta);
 
   // --- preview ---
   const consoleEntries: ConsoleEntry[] = hook.console;
   let unseenErrors = 0;
   let lastRenderAt = 0;
-  const preview = new Preview($("preview-frames"), () =>
-    composeDocument({
+  /** The page: the three files as they are, or with the TypeScript turned into JavaScript first (worker). */
+  function buildPage(): Built | Promise<Built> {
+    const src = {
       html: texts.html.toString(),
       css: texts.css.toString(),
       js: texts.js.toString(),
       jsModule: meta.get("jsModule") === true,
-    }), {
+    };
+    if (scriptLang() !== "ts" || !src.js.trim()) return { html: composeDocument(src) };
+    return tsClient().call("transpile", src.js).then((t) => ({
+      html: composeDocument({ ...src, js: t.js }),
+      toSource: sourceLookup(t.map),
+      label: "TS",
+    }));
+  }
+  const preview = new Preview($("preview-frames"), buildPage, {
     console: (e) => addConsole(e),
     started: () => {
       pendingJsErrors = [];
@@ -515,6 +556,7 @@ function startRoom(roomId: string) {
       if (pending) pendingJsErrors.push(err);
       else if (collectingJs) shownJsErrors.push(err);
       else if (settings.get().showErrors) {
+        shownJsErrors.push(err);
         addShownErrors(editors.js.view, [err]);
         errorsChanged();
       }
@@ -538,22 +580,51 @@ function startRoom(roomId: string) {
   function refreshErrors() {
     if (!settings.get().showErrors) return clearErrors();
     showErrors(editors.css.view, cssErrors(texts.css.toString()));
+    refreshTypeErrors();
     collectingJs = true;
     shownJsErrors = pendingJsErrors;
     pendingJsErrors = [];
     clearTimeout(collectTimer);
     collectTimer = setTimeout(() => {
       collectingJs = false;
-      showErrors(editors.js.view, shownJsErrors);
+      showErrors(editors.js.view, jsErrors());
       errorsChanged();
     }, 300);
     errorsChanged();
   }
   function clearErrors() {
     clearTimeout(collectTimer);
+    clearTimeout(typeTimer);
     collectingJs = false;
+    typeErrors = [];
+    typeRound++;
     for (const f of ["css", "js"] as const) showErrors(editors[f].view, []);
     errorsChanged();
+  }
+  // TypeScript: the type errors of the script (worker), next to what the browser reported when running it.
+  // Asked again after the person's refresh delay: a change of types alone does not change the page.
+  let typeErrors: CodeError[] = [];
+  let typeRound = 0;
+  let typeTimer: number | undefined;
+  const jsErrors = () => [...typeErrors, ...shownJsErrors].sort((a, b) => a.line - b.line);
+  function refreshTypeErrors() {
+    clearTimeout(typeTimer);
+    const round = ++typeRound;
+    if (scriptLang() !== "ts" || !settings.get().showErrors) {
+      if (typeErrors.length) {
+        typeErrors = [];
+        if (!collectingJs) showErrors(editors.js.view, jsErrors());
+        errorsChanged();
+      }
+      return;
+    }
+    tsClient().call("errors", texts.js.toString()).then((list) => {
+      if (round !== typeRound || scriptLang() !== "ts" || !settings.get().showErrors) return;
+      typeErrors = list.map((e) => ({ line: e.line, col: e.col, message: e.message }));
+      if (collectingJs) return; // shown with the run's own errors in a moment
+      showErrors(editors.js.view, jsErrors());
+      errorsChanged();
+    }, () => {});
   }
   function errorsChanged() {
     labelTabs();
@@ -568,8 +639,13 @@ function startRoom(roomId: string) {
   }
   doc.on("update", () => {
     const s = settings.get();
-    if (s.autoRun && !previewPaused) preview.schedule(s.previewDelay);
-    else setPreviewStatus();
+    if (s.autoRun && !previewPaused) {
+      preview.schedule(s.previewDelay);
+      if (scriptLang() === "ts" && s.showErrors) {
+        clearTimeout(typeTimer);
+        typeTimer = setTimeout(refreshTypeErrors, s.previewDelay);
+      }
+    } else setPreviewStatus();
   });
 
   function setPreviewStatus() {
@@ -845,6 +921,7 @@ function startRoom(roomId: string) {
     tabHtml: () => selectTab("html", true),
     tabCss: () => selectTab("css", true),
     tabJs: () => selectTab("js", true),
+    toggleTypeScript: () => meta.set("jsLang", scriptLang() === "ts" ? "js" : "ts"),
     // several files shown: next / previous go through them in their order; one shown: through all files
     nextTab: () => selectTab(cycle(1), true),
     prevTab: () => selectTab(cycle(-1), true),
@@ -1192,6 +1269,7 @@ function startRoom(roomId: string) {
       renders: hook.renders,
       console: hook.console,
       text: (f: FileId) => texts[f].toString(),
+      scriptLang: () => scriptLang(),
       setText: (f: FileId, s: string) =>
         doc.transact(() => {
           texts[f].delete(0, texts[f].length);

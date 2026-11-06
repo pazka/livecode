@@ -145,6 +145,19 @@ export const editorTheme = EditorView.theme({
     whiteSpace: "pre",
     userSelect: "none",
   },
+  // TypeScript (ts/client.ts): a type and its documentation, in the hover box and the completion's side box
+  ".cm-lc-typeInfo": { maxWidth: "36rem", padding: "4px 8px", fontFamily: "var(--ui-font)" },
+  ".cm-lc-typeInfo code": {
+    display: "block",
+    fontFamily: "var(--mono)",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    background: "none",
+    border: "none",
+    padding: "0",
+  },
+  ".cm-lc-typeInfo p": { margin: "6px 0 2px", color: "var(--muted)", lineHeight: "1.45" },
+  ".cm-tooltip.cm-completionInfo": { padding: "0" },
   // carets close together (cursors.ts): no name chips piled on the text, the name shows on hover
   ".cm-ySelectionCaret.cm-yCrowded > .cm-ySelectionInfo": { opacity: "0", pointerEvents: "none" },
   ".cm-ySelectionCaret.cm-yCrowded:hover > .cm-ySelectionInfo": { opacity: "1" },

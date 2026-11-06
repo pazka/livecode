@@ -16,6 +16,15 @@ export interface PageError {
   text: string;
 }
 
+/** One version of the page: the document, and for a TypeScript script the way back to its lines. */
+export interface Built {
+  html: string;
+  /** The script's line / column (1-based, col 0 = unknown) in the source the room wrote. */
+  toSource?: (line: number, col: number) => { line: number; col: number } | null;
+  /** How the console names the script's lines ("JS line 3" / "TS line 5"). */
+  label?: string;
+}
+
 export interface PreviewEvents {
   console(e: ConsoleEntry): void;
   /** A positioned error of the version being shown (`pending`: of the one about to be). */
@@ -50,16 +59,18 @@ export function previousRunFroze(): boolean {
 export class Preview {
   private current: HTMLIFrameElement | null = null;
   private pending: HTMLIFrameElement | null = null;
-  private pendingHtml = "";
+  private pendingBuilt: Built = { html: "" };
   private lastHtml: string | null = null;
-  private currentHtml = "";
+  private currentBuilt: Built = { html: "" };
   private timer: number | undefined;
+  private builds = 0;
   private swapTimer: number | undefined;
   private lastAliveWrite = 0;
 
   constructor(
     private readonly host: HTMLElement,
-    private readonly build: () => string,
+    /** The page to show; a promise when it takes a step first (TypeScript → JavaScript). */
+    private readonly build: () => Built | string | Promise<Built>,
     private readonly on: PreviewEvents,
   ) {
     addEventListener("message", (e) => this.onMessage(e));
@@ -78,7 +89,32 @@ export class Preview {
   /** Render now; `force` re-runs even when nothing changed (Run command). */
   render(force: boolean) {
     clearTimeout(this.timer);
-    const html = this.build();
+    const n = ++this.builds;
+    let b: Built | string | Promise<Built>;
+    try {
+      b = this.build();
+    } catch (e) {
+      return this.buildFailed(e);
+    }
+    if (b instanceof Promise) {
+      // only the newest build is shown; an older one that resolves late is dropped
+      b.then(
+        (v) => n === this.builds && this.show(v, force),
+        (e) => n === this.builds && this.buildFailed(e),
+      );
+    } else this.show(typeof b === "string" ? { html: b } : b, force);
+  }
+
+  private buildFailed(e: unknown) {
+    this.on.console({
+      level: "error",
+      text: `The page could not be prepared: ${e instanceof Error ? e.message : String(e)}`,
+      at: Date.now(),
+    });
+  }
+
+  private show(built: Built, force: boolean) {
+    const html = built.html;
     if (!force && html === this.lastHtml) return;
     this.lastHtml = html;
     // a newer version replaces a frame that is still loading
@@ -91,7 +127,7 @@ export class Preview {
     f.setAttribute("aria-hidden", "true");
     f.src = "/preview";
     this.pending = f;
-    this.pendingHtml = html;
+    this.pendingBuilt = built;
     this.on.started?.();
     this.host.appendChild(f);
     clearTimeout(this.swapTimer);
@@ -103,7 +139,7 @@ export class Preview {
     if (this.pending !== f) return;
     clearTimeout(this.swapTimer);
     this.pending = null;
-    this.currentHtml = this.pendingHtml;
+    this.currentBuilt = this.pendingBuilt;
     const old = this.current;
     this.current = f;
     f.classList.remove("pending");
@@ -128,7 +164,10 @@ export class Preview {
     const fromCurrent = this.current !== null && e.source === this.current.contentWindow;
     if (!fromPending && !fromCurrent) return;
     if (d.type === "ready" && fromPending) {
-      this.pending!.contentWindow!.postMessage({ __lc: 1, type: "render", html: this.pendingHtml }, "*");
+      this.pending!.contentWindow!.postMessage(
+        { __lc: 1, type: "render", html: this.pendingBuilt.html },
+        "*",
+      );
     } else if (d.type === "alive") {
       if (fromPending) this.swap(this.pending!);
       const now = Date.now();
@@ -142,16 +181,30 @@ export class Preview {
       const e = d as { file?: unknown; line?: unknown; col?: unknown };
       if (typeof e.line !== "number" || !Number.isFinite(e.line) || e.line < 1) return;
       // the script's own URL (sourceURL) → its line; the page's URL (a syntax error) → mapped back
-      const line = String(e.file ?? "").endsWith(JS_SOURCE_URL)
+      const built = fromPending ? this.pendingBuilt : this.currentBuilt;
+      const jsLine = String(e.file ?? "").endsWith(JS_SOURCE_URL)
         ? e.line
-        : scriptLine(fromPending ? this.pendingHtml : this.currentHtml, e.line, d.text);
-      if (line === null) return;
-      const col = typeof e.col === "number" && Number.isFinite(e.col) && e.col > 0 ? e.col : 0;
-      this.on.pageError?.({ line, col, text: d.text.slice(0, 500) }, fromPending);
+        : scriptLine(built.html, e.line, d.text);
+      if (jsLine === null) return;
+      const jsCol = typeof e.col === "number" && Number.isFinite(e.col) && e.col > 0 ? e.col : 0;
+      // a TypeScript script: the line the room wrote, not the one of the JavaScript that ran
+      const at = built.toSource ? built.toSource(jsLine, jsCol) : { line: jsLine, col: jsCol };
+      if (!at) return;
+      this.on.pageError?.({ line: at.line, col: at.col, text: d.text.slice(0, 500) }, fromPending);
     } else if (d.type === "console" && typeof d.text === "string") {
       // messages of a version that is about to be replaced still count: they are that version's output
       const level = ["log", "info", "warn", "error", "debug"].includes(d.level ?? "") ? d.level : "log";
-      this.on.console({ level: level as ConsoleEntry["level"], text: d.text.slice(0, 4000), at: Date.now() });
+      const built = fromPending ? this.pendingBuilt : this.currentBuilt;
+      const text = built.toSource ? relabel(d.text, built) : d.text;
+      this.on.console({ level: level as ConsoleEntry["level"], text: text.slice(0, 4000), at: Date.now() });
     }
   }
+}
+
+/** "(JS line 7)" in a console message → the line of the source the room wrote ("(TS line 4)"). */
+export function relabel(text: string, built: Built): string {
+  return text.replace(/\(JS line (\d+)\)/g, (all, n: string) => {
+    const at = built.toSource?.(Number(n), 0);
+    return at ? `(${built.label ?? "JS"} line ${at.line})` : all;
+  });
 }

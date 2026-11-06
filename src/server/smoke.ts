@@ -37,7 +37,14 @@ export async function runSmoke(base: string, _args: string[]): Promise<number> {
       const css = await fetch(`${base}/app.css`);
       await css.body?.cancel();
       must(css.status === 200, `app.css ${css.status}`);
-      return `app.js ${Math.round(size / 1024)} KiB`;
+      // the TypeScript worker (compiler + DOM types), loaded by rooms whose script is TypeScript
+      must(csp.includes("worker-src 'self'"), `csp ${csp}`);
+      const tsw = html.match(/content="(\/ts-worker\.js\?v=[0-9a-f]+)"/)?.[1];
+      must(tsw, "index.html does not reference /ts-worker.js?v=<hash>");
+      const w = await fetch(`${base}${tsw}`);
+      const wsize = (await w.arrayBuffer()).byteLength;
+      must(w.status === 200 && wsize > 2_000_000, `ts-worker.js ${w.status} ${wsize} B`);
+      return `app.js ${Math.round(size / 1024)} KiB, ts-worker.js ${Math.round(wsize / 1024)} KiB`;
     }],
     ["preview frame isolation headers", async () => {
       const r = await fetch(`${base}/preview`);

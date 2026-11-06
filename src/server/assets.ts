@@ -15,7 +15,7 @@ export function loadAssets(): Map<string, Asset> {
   for (const [path, a] of Object.entries(ASSETS)) {
     m.set(path, {
       type: a.type,
-      body: b64(a.b64),
+      body: a.b64 ? b64(a.b64) : undefined,
       gzip: a.gz ? b64(a.gz) : undefined,
       immutable: a.immutable,
     });

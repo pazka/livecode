@@ -22,6 +22,7 @@ export const FAKE_ASSETS = new Map<string, Asset>([
     immutable: false,
   }],
   ["/preview.js", { type: "text/javascript; charset=utf-8", body: enc("1"), immutable: true }],
+  ["/ts-worker.js", { type: "text/javascript; charset=utf-8", body: enc("1"), immutable: true }],
 ]);
 
 export interface TestServer {

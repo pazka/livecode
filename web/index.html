@@ -9,6 +9,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/app.css?v=@@CSS_HASH@@">
 <script type="module" src="/app.js?v=@@JS_HASH@@"></script>
+<meta name="livecode-ts-worker" content="/ts-worker.js?v=@@TSW_HASH@@">
 </head>
 <body>
 <div class="backdrop" aria-hidden="true"></div>
@@ -92,9 +93,12 @@
           <button type="button" id="tab-css" aria-controls="pane-css" data-file="css" draggable="true"><span
               class="ft ft-css" aria-hidden="true">#</span>style.css<span class="dots" aria-hidden="true"></span><span class="errs" aria-hidden="true" hidden></span></button>
           <button type="button" id="tab-js" aria-controls="pane-js" data-file="js" draggable="true"><span
-              class="ft ft-js" aria-hidden="true">JS</span>script.js<span class="dots" aria-hidden="true"></span><span class="errs" aria-hidden="true" hidden></span></button>
+              class="ft ft-js" aria-hidden="true">JS</span><span class="fname">script.js</span><span class="dots" aria-hidden="true"></span><span class="errs" aria-hidden="true" hidden></span></button>
         </div>
         <span class="spacer"></span>
+        <label class="switch small" id="ts-toggle" hidden title="Write the script in TypeScript (types, typed completions, type errors) — shared with the room">
+          <input type="checkbox" id="js-ts" role="switch"><span class="track" aria-hidden="true"></span><span>TypeScript</span>
+        </label>
         <label class="switch small" id="module-toggle" hidden title="Shared with the room">
           <input type="checkbox" id="js-module" role="switch"><span class="track" aria-hidden="true"></span><span>ES module</span>
         </label>
