@@ -82,8 +82,10 @@ Worst case on disk: 512 MB (inside the 7-day TTL); in memory: bounded by the RSS
 
 1. `GET /healthz` → 200 `{"status":"ok","storage":"writable","version":"vX.Y.Z","rooms":{…},"connections":n}`
    (writes and reads back a probe file in `/data`).
-2. `GET /r/<room>` → 200 HTML referencing `/app.js?v=<hash>`; CSP has `script-src 'self'` and
-   `frame-ancestors 'none'`; `/app.js?v=…` → 200, > 100 KB (the editor bundle), `/app.css` → 200.
+2. `GET /r/<room>` → 200 HTML referencing `/app.js?v=<hash>`; CSP has `script-src 'self'`,
+   `frame-ancestors 'none'` and `worker-src 'self'`; `/app.js?v=…` → 200, > 100 KB (the editor bundle),
+   `/app.css` → 200; the HTML also names `/ts-worker.js?v=<hash>` → 200, > 2 MB once inflated (the
+   TypeScript compiler + the DOM's type definitions, kept gzipped in the binary).
 3. `GET /preview` → 200 with CSP `form-action 'none'` + `frame-ancestors 'self'`; `/preview.js` has
    `Cross-Origin-Resource-Policy: cross-origin` (the sandboxed frame must be able to load it).
 4. `GET /new` → 303 `Location: /r/<12 chars>`.
@@ -96,7 +98,9 @@ Worst case on disk: 512 MB (inside the 7-day TTL); in memory: bounded by the RSS
 9. Loopback: `127.0.0.1:9134/healthz` ok; nothing on `0.0.0.0:9134`.
 
 By hand once (browser): two windows in one room see each other's cursor and name; typing refreshes the
-other's preview; Settings → Theme / Keymap / a shortcut change takes effect at once.
+other's preview; Settings → Theme / Keymap / a shortcut change takes effect at once; the **TypeScript**
+switch above the code turns `script.js` into `script.ts` for both windows, `document.` then lists the DOM's
+members with their types, and a wrong type (`const n: number = "a"`) is marked on its line.
 
 ## 4. What runs
 | Item | Value |

@@ -57,5 +57,7 @@ an app that follows it deploys first try. Values already fixed for this project:
 - No local Deno needed: Actions → **bootstrap** regenerates `deno.lock`, produces a `deno fmt` patch and a
   full report (build, lint, check, tests, e2e) as artifacts.
 - Pure modules have unit tests (`tests/`): keys/keymaps (every preset conflict-free on PC and Mac),
-  loop guard, preview composition, themes (WCAG contrast of every theme). Server: real-socket integration
+  loop guard, preview composition, themes (WCAG contrast of every theme), TypeScript service + source maps.
+- TypeScript (feature 14): `src/client/ts/` runs in `/ts-worker.js` (bundled separately, embedded gzip-only);
+  its lib files come from the pinned package at build time (`deno task tslibs` → `libs.gen.ts`, gitignored). Server: real-socket integration
   tests. `e2e/` drives two Chromium windows in one room.

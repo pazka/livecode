@@ -61,10 +61,29 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
 13. **Console: "Keep between runs"** switch in the console header (per person, **off by default**): off, each
    new run of the preview starts with an empty console; on, earlier output stays and a "page reloaded" divider
    marks each run. Also in the palette.
+14. **TypeScript** (owner, 2026-11-06: *"use typescript too, so that autocompletion works with typescript
+   objects and all the basic TS DOM definitions … same for custom made objects, types, interfaces"*): a
+   **TypeScript** switch above the code (room-wide, like "ES module"; also "Script language" in the palette)
+   turns `script.js` into `script.ts`. Then, from the TypeScript language service with the browser's own type
+   definitions (lib.esnext + lib.dom), in a worker loaded only by such rooms:
+   - completions know the types: `document.` → the Document's members, an element's members after
+     `querySelector("button")`, a canvas context's, the room's own **interfaces, types, classes and enums**
+     (`p.` → exactly the fields of `Point`, optional ones marked), event names inside `addEventListener("…")`,
+     a union's literal values; each with its signature and documentation beside the list;
+   - the type under the mouse (hover), and **Show the type at the cursor** by keyboard (VS Code Ctrl/Cmd+K
+     Ctrl/Cmd+I, any preset can bind it; announced to screen readers); Escape closes it;
+   - **type errors** (strict mode) marked like the other errors (feature 11), refreshed after the person's
+     delay even when only types changed;
+   - the preview runs the TypeScript with its types removed (nothing else changed: same ES version, imports
+     kept for a module); runtime errors and loop-guard stops are shown on the **TypeScript** line, and the
+     console says "TS line N". Imports from a URL are typed `any`; top-level names never clash with the DOM's
+     globals (`name`, `status` …).
 
-## Stack (Decision #17 deps approved by the owner, 2026-11-04)
+## Stack (Decision #17 deps approved by the owner, 2026-11-04; typescript 2026-11-06)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,
-y-codemirror.next, @replit/codemirror-vim, @replit/codemirror-emacs; CI-only: @std/assert, playwright-core.
+y-codemirror.next, @replit/codemirror-vim, @replit/codemirror-emacs, **typescript 6.0.3** (Microsoft,
+Apache-2.0, no dependencies; browser-side only, in `/ts-worker.js` — 6.0 is the last TypeScript written in
+JavaScript, 7.x is a native binary that cannot run in a page); CI-only: @std/assert, playwright-core.
 No other runtime dependency; no outbound calls from the server.
 
 ## Not in v0.1 (ideas for the owner)
