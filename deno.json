@@ -24,7 +24,8 @@
     "@lezer/highlight": "npm:@lezer/highlight@1.2.5",
     "@replit/codemirror-vim": "npm:@replit/codemirror-vim@6.4.0",
     "@replit/codemirror-emacs": "npm:@replit/codemirror-emacs@6.1.0",
-    "playwright-core": "npm:playwright-core@1.64.1"
+    "playwright-core": "npm:playwright-core@1.64.1",
+    "typescript": "npm:typescript@6.0.3"
   },
   "compilerOptions": {
     "strict": true,
@@ -45,6 +46,7 @@
     ],
     "exclude": [
       "src/server/assets.gen.ts",
+      "src/client/ts/libs.gen.ts",
       "src/client/vendor/"
     ]
   },
@@ -53,7 +55,8 @@
       "src/client/vendor/",
       "web/",
       "dist/",
-      "src/server/assets.gen.ts"
+      "src/server/assets.gen.ts",
+      "src/client/ts/libs.gen.ts"
     ]
   },
   "exclude": [
@@ -61,7 +64,8 @@
     "data/"
   ],
   "tasks": {
-    "bundle": "mkdir -p dist/web && deno bundle --platform=browser --minify --output=dist/web/app.js src/client/main.ts",
+    "tslibs": "deno run --allow-read --allow-write=src/client/ts/libs.gen.ts scripts/tslibs.ts",
+    "bundle": "mkdir -p dist/web && deno task tslibs && deno bundle --platform=browser --minify --output=dist/web/app.js src/client/main.ts && deno bundle --platform=browser --minify --output=dist/web/ts-worker.js src/client/ts/worker.ts",
     "embed": "deno run --allow-read=dist,web --allow-write=dist/web/index.html,dist/web/preview.html,src/server/assets.gen.ts scripts/embed.ts",
     "build": "deno task bundle && deno task embed",
     "check": "deno fmt --check && deno lint && deno check src/ tests/ scripts/ e2e/",
