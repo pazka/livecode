@@ -88,6 +88,12 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
    and comes back on hover or focus. It is **not a person**: everyone sees an **eye** in its owner's colour
    after the avatars ("Ada's preview screen"), the status says "2 people · 1 preview screen", no cursor,
    no file dot; opening / closing it is announced as such. Same tab reused per room.
+16. **Page hidden in the editor** (owner, 2026-11-09: *"if I run the preview on another screen, I can minimize the
+   preview on the coding screen … and / or keep only the console"*): the "Hide the page here" button in the
+   preview header (per person; also in the palette) leaves the console alone in the preview area when it is
+   open, or removes the area (code full width) when it is closed; a **Preview** button then appears in the top
+   bar, with the count of new errors, to bring it back. The hidden preview keeps running: errors are still
+   marked in the code and counted.
 
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04; typescript 2026-11-06)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,

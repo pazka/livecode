@@ -72,6 +72,10 @@ Deno.test("settings: the console is not kept between runs unless asked", () => {
   assertEquals(defaults().keepConsole, false);
   assertEquals(sanitize({ keepConsole: true }).keepConsole, true);
   assertEquals(sanitize({ keepConsole: "yes" }).keepConsole, false);
+  // the page in the editor's preview area: shown by default, hidden only when asked
+  assertEquals(defaults().previewPage, true);
+  assertEquals(sanitize({ previewPage: false }).previewPage, false);
+  assertEquals(sanitize({ previewPage: 0 }).previewPage, true);
 });
 
 Deno.test("settings: sanitize keeps valid values, drops junk", () => {

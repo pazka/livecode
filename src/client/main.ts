@@ -703,17 +703,23 @@ function startRoom(roomId: string) {
     if (atBottom) consoleList.scrollTop = consoleList.scrollHeight;
     if (e.level === "error" && !settings.get().consoleOpen) {
       unseenErrors++;
-      const c = $("console-count");
-      c.hidden = false;
+      showUnseen();
+    }
+  }
+  /** New errors not seen yet: on the console button, and on the top bar's Preview button when it is hidden. */
+  function showUnseen() {
+    for (const id of ["console-count", "preview-show-count"]) {
+      const c = $(id);
+      c.hidden = unseenErrors === 0;
       c.textContent = String(unseenErrors);
-      c.setAttribute("aria-label", `${unseenErrors} new errors`);
+      c.setAttribute("aria-label", `${unseenErrors} new ${unseenErrors === 1 ? "error" : "errors"}`);
     }
   }
   function clearConsole(quiet = false) {
     consoleEntries.length = 0;
     consoleList.replaceChildren();
     unseenErrors = 0;
-    $("console-count").hidden = true;
+    showUnseen();
     if (!quiet) announce("Console cleared");
   }
   /**
@@ -890,9 +896,23 @@ function startRoom(roomId: string) {
     $("console-btn").setAttribute("aria-expanded", String(s.consoleOpen));
     if (s.consoleOpen) {
       unseenErrors = 0;
-      $("console-count").hidden = true;
+      showUnseen();
     }
+    // the page here, or only the console (the page is on a preview screen), or nothing: code full width
+    const mode = s.previewPage ? "page" : s.consoleOpen ? "console" : "none";
+    if (ws.dataset.preview !== mode) {
+      ws.dataset.preview = mode;
+      for (const f of FILES) editors[f].view.requestMeasure();
+    }
+    const pageBtn = $("preview-page-btn");
+    pageBtn.setAttribute("aria-pressed", String(!s.previewPage));
+    $("preview-show").hidden = mode !== "none";
   }
+  $("preview-page-btn").addEventListener("click", () => app.togglePreviewPage());
+  $("preview-show").addEventListener("click", () => {
+    settings.update({ previewPage: true });
+    announce("Preview shown");
+  });
   let dragging = false;
   splitter.addEventListener("pointerdown", (e) => {
     dragging = true;
@@ -944,7 +964,7 @@ function startRoom(roomId: string) {
       editors[current].view.contentDOM,
       document.querySelector<HTMLIFrameElement>(".preview-frame:not(.pending)"),
       settings.get().consoleOpen ? consoleList : null,
-    ].filter((x): x is HTMLElement => x !== null);
+    ].filter((x): x is HTMLElement => x !== null && x.getClientRects().length > 0);
 
   const app: Record<string, () => void> = {
     run: runPreview,
@@ -954,6 +974,18 @@ function startRoom(roomId: string) {
       announce(`Auto-refresh ${settings.get().autoRun ? "on" : "off"}`);
     },
     toggleConsole: () => settings.update({ consoleOpen: !settings.get().consoleOpen }),
+    togglePreviewPage: () => {
+      const page = !settings.get().previewPage;
+      settings.update({ previewPage: page });
+      const s = settings.get();
+      announce(
+        page
+          ? "Page shown in the preview"
+          : s.consoleOpen
+          ? "Page hidden: console only"
+          : "Preview hidden: code full width",
+      );
+    },
     clearConsole: () => clearConsole(),
     toggleKeepConsole: () => {
       settings.update({ keepConsole: !settings.get().keepConsole });

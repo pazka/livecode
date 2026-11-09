@@ -24,6 +24,11 @@ export interface Settings {
   /** Editor share of the workspace, percent. */
   split: number;
   consoleOpen: boolean;
+  /**
+   * The page shown in the editor's preview area (on by default). Off — it is on a preview screen — the area
+   * keeps only the console when it is open, and goes away (code full width) when it is closed.
+   */
+  previewPage: boolean;
   /** Console output kept when the preview reloads (off by default: each run starts with an empty console). */
   keepConsole: boolean;
   /** Errors of the JS and CSS drawn in the editors, refreshed with the preview (on by default). */
@@ -88,6 +93,7 @@ export function defaults(): Settings {
     layout: "columns",
     split: 50,
     consoleOpen: false,
+    previewPage: true,
     keepConsole: false,
     showErrors: true,
     panes: ["html"],
@@ -130,6 +136,7 @@ export function sanitize(raw: unknown, base: Settings = defaults()): Settings {
     layout: r.layout === "rows" || r.layout === "columns" ? r.layout : base.layout,
     split: num(r.split, 15, 85, base.split),
     consoleOpen: typeof r.consoleOpen === "boolean" ? r.consoleOpen : base.consoleOpen,
+    previewPage: typeof r.previewPage === "boolean" ? r.previewPage : base.previewPage,
     keepConsole: typeof r.keepConsole === "boolean" ? r.keepConsole : base.keepConsole,
     showErrors: typeof r.showErrors === "boolean" ? r.showErrors : base.showErrors,
     panes: sanitizePanes(r.panes, base.panes),

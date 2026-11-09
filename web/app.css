@@ -705,3 +705,9 @@ legend { font-weight: 700; font-size: 1.15rem; padding: 0.6rem 0 0.4rem; }
 .avatar.viewer-eye:hover { transform: none; }
 .avatar.viewer-eye .i { width: 0.95rem; height: 0.95rem; }
 .viewing .skip-link, .viewing .backdrop { display: none; }
+
+/* the page not shown in the editor (it is on a preview screen): the console alone, or nothing (code full width) */
+.workspace[data-preview="console"] .preview-frames { display: none; }
+.workspace[data-preview="console"] .console { flex: 1; border-top: 0; }
+.workspace[data-preview="none"] .preview-island, .workspace[data-preview="none"] .splitter { display: none; }
+.workspace[data-preview="none"] .editor-island { flex: 1 1 100%; }

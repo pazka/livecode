@@ -232,6 +232,53 @@ Deno.test({
         await expectTrue(v!, `!document.fullscreenElement`, "fullscreen off", 3000);
       });
 
+      const mode = `document.getElementById("workspace").dataset.preview`;
+      const width = (sel: string) =>
+        `Math.round(document.querySelector("${sel}").getBoundingClientRect().width)`;
+      await check("editor: hide the page here → code full width, Preview button in the top bar", async () => {
+        await a.bringToFront();
+        await setText(a, "js", "");
+        await a.click("#preview-page-btn");
+        await expectTrue(a, `${mode} === "none"`, "nothing in the preview area");
+        await expectTrue(
+          a,
+          `document.getElementById("preview-area").getClientRects().length === 0`,
+          "area gone",
+        );
+        await expectTrue(a, `${width("#editor-area")} >= ${width("#workspace")} - 2`, "code full width");
+        await expectTrue(a, `!document.getElementById("preview-show").hidden`, "Preview button shown");
+        await shot(a, "screen-04-code-full-width");
+      });
+      await check(
+        "editor: the hidden preview still runs (errors counted on the Preview button)",
+        async () => {
+          await setText(b, "js", 'throw new Error("boom from the hidden preview")');
+          await expectTrue(a, `!document.getElementById("preview-show-count").hidden`, "error count", 10_000);
+          await setText(b, "js", "");
+        },
+      );
+      await check("editor: console only (page on the screen), then the page back", async () => {
+        await a.click("#preview-show");
+        await expectTrue(a, `${mode} === "page"`, "page back");
+        await a.click("#console-btn");
+        await a.click("#preview-page-btn");
+        await expectTrue(a, `${mode} === "console"`, "console only");
+        await expectTrue(
+          a,
+          `getComputedStyle(document.getElementById("preview-frames")).display === "none"`,
+          "no page",
+        );
+        await expectTrue(
+          a,
+          `document.getElementById("console").getBoundingClientRect().height > document.getElementById("preview-area").getBoundingClientRect().height * 0.8`,
+          "console fills the area",
+        );
+        await shot(a, "screen-05-console-only");
+        await a.click("#preview-page-btn");
+        await a.click("#console-btn");
+        await expectTrue(a, `${mode} === "page"`, "back to the page");
+      });
+
       await check("close: the eye goes away", async () => {
         await v!.close();
         await expectTrue(b, `(globalThis).__livecode.previewScreens() === 0`, "screen gone", 8000);
@@ -240,7 +287,7 @@ Deno.test({
       });
 
       await check("no page errors anywhere", () => {
-        const real = [...new Set(errors.filter((e) => !e.includes("favicon")))];
+        const real = [...new Set(errors.filter((e) => !e.includes("favicon") && !e.includes("boom from")))];
         if (real.length) throw new Error(real.slice(0, 12).join(" | "));
         return Promise.resolve();
       });

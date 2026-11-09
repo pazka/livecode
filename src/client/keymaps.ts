@@ -31,6 +31,7 @@ const COMMON_APP: Bindings = {
   toggleKeepConsole: [],
   focusPreview: [],
   previewScreen: [],
+  togglePreviewPage: [],
   tabHtml: ["Alt-1"],
   tabCss: ["Alt-2"],
   tabJs: ["Alt-3"],
