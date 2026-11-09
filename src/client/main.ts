@@ -20,7 +20,7 @@ import {
   resizePair,
   setPaneCount,
 } from "./panes.ts";
-import { ariaShortcut, displayBinding, eventStrokes } from "./keys.ts";
+import { ariaShortcut, displayBinding, displayMouse, eventStrokes } from "./keys.ts";
 import { effectiveBindings, isPlainKey, makeMatcher, type Matcher, PRESETS } from "./keymaps.ts";
 import { type ConsoleEntry, Preview, previousRunFroze } from "./preview.ts";
 import { RoomProvider, type Status } from "./provider.ts";
@@ -1256,6 +1256,19 @@ function startRoom(roomId: string) {
         "Change any shortcut in Settings → Keyboard.",
       ),
       ...[...groups].flatMap(([g, items]) => [h("h3", { text: g }), h("dl", {}, ...items)]),
+      h("h3", { text: "Mouse" }),
+      h(
+        "dl",
+        {},
+        h("dt", {
+          text: `${displayMouse(preset.mouse.addCursor, "Click")}${
+            preset.mouse.addCursor === "Mod" ? "" : `  ${displayMouse("Mod", "Click")}`
+          }`,
+        }),
+        h("dd", { text: "Add a cursor (click again on it to remove it)" }),
+        h("dt", { text: displayMouse(preset.mouse.column, "Drag") }),
+        h("dd", { text: "Column (box) selection: one cursor per line" }),
+      ),
     );
   }
 

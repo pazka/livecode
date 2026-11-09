@@ -208,3 +208,26 @@ export function ariaShortcut(bindings: string[], mac = IS_MAC): string {
     return [...names, key === "Space" ? "Space" : key.length === 1 ? key.toUpperCase() : key].join("+");
   }).join(" ");
 }
+
+// ---------- mouse ----------
+
+/** Mouse modifiers of a gesture (multiple cursors): "Mod" = Cmd on macOS, Ctrl elsewhere. */
+export type MouseMods = "Alt" | "Alt-Shift" | "Mod";
+
+/** True when a mouse event carries exactly these modifiers. */
+export function mouseMods(
+  e: Pick<MouseEvent, "altKey" | "shiftKey" | "ctrlKey" | "metaKey">,
+  m: MouseMods,
+  mac = IS_MAC,
+): boolean {
+  const mod = mac ? e.metaKey : e.ctrlKey;
+  if (m === "Mod") return mod && !e.altKey && !e.shiftKey;
+  return e.altKey && !mod && e.shiftKey === (m === "Alt-Shift");
+}
+
+/** "Alt+Click", "⌥⇧Click", "Ctrl+Drag" … */
+export function displayMouse(m: MouseMods, action: "Click" | "Drag", mac = IS_MAC): string {
+  const mods = m === "Mod" ? ["Meta"] : m === "Alt" ? ["Alt"] : ["Alt", "Shift"];
+  if (mac) return mods.map((x) => MAC_SYMBOLS[x]).join("") + action;
+  return [...mods.map((x) => (x === "Meta" ? "Ctrl" : x)), action].join("+");
+}

@@ -95,6 +95,19 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
    bar, with the count of new errors, to bring it back. The hidden preview keeps running: errors are still
    marked in the code and counted.
 
+17. **Rename** (owner, 2026-11-09): VS Code **F2**, JetBrains **Shift+F6**, "Rename" in the palette (bindable in
+   any preset). A box over the name, every use highlighted; Enter renames them all in one edit (one undo step,
+   shared), Escape cancels. In the script (JS or TS) the TypeScript service finds the uses, scope-aware
+   (another `x` in another function is untouched; a property follows its uses; the browser's own names are
+   refused with a message); in HTML / CSS, every whole-word occurrence in the file.
+18. **Multiple cursors with the mouse, as in each editor** (owner): VS Code **Alt+click** adds a cursor,
+   **Shift+Alt+drag** selects a column; JetBrains **Alt+Shift+click** adds a caret (on a caret: removes it),
+   **Alt+drag** a column; Sublime / Vim / Emacs Ctrl/⌘+click and Alt+drag. Ctrl/⌘+click adds a cursor in every
+   preset. Keyboard help lists the gestures of the current keymap.
+19. **Completion icons** are letters in the theme's token colours (m method, ƒ function, p property, v variable,
+   c constant, C class, I interface, T type, E enum, k keyword) — CodeMirror's □ / 𝑥 symbols showed as
+   missing-glyph boxes on macOS.
+
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04; typescript 2026-11-06)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,
 y-codemirror.next, @replit/codemirror-vim, @replit/codemirror-emacs, **typescript 6.0.3** (Microsoft,

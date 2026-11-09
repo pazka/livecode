@@ -18,6 +18,7 @@ const api: TsApi = {
   typeAt: (text, pos) => service.typeAt(text, pos),
   errors: (text) => service.errors(text),
   transpile: (text) => service.transpile(text),
+  rename: (text, pos, lang) => service.rename(text, pos, lang),
 };
 
 scope.onmessage = (e) => {

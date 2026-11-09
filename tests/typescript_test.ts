@@ -203,3 +203,41 @@ Deno.test("typescript: the pinned compiler is one that runs in a page (6.x, Java
   assertEquals(typeof ts.createLanguageService, "function");
   assertEquals(typeof ts.transpileModule, "function");
 });
+
+Deno.test("typescript: rename is scope-aware (another x elsewhere is not touched)", () => {
+  const src = `let count = 0;
+function add(n: number) {
+  count += n;
+  return count;
+}
+function other() {
+  const count = "mine";
+  return count;
+}
+`;
+  const r = service.rename(src, src.indexOf("count"));
+  assert(r.ok);
+  assertEquals(r.name, "count");
+  // the module-level count: its declaration and the 2 uses in add(), not other()'s own count
+  assertEquals(r.ranges.map((x) => src.slice(0, x.from).split("\n").length), [1, 3, 4]);
+});
+
+Deno.test("typescript: rename of an interface property follows its uses; DOM names can't be renamed", () => {
+  const src = "interface P { label: string }\nconst p: P = { label: 'a' };\np.label.length;\n";
+  const r = service.rename(src, src.indexOf("label"));
+  assert(r.ok);
+  assertEquals(r.ranges.length, 3);
+  const dom = "document.getElementById('x');";
+  const no = service.rename(dom, dom.indexOf("getElementById") + 2);
+  assert(!no.ok);
+});
+
+Deno.test("typescript: rename works in a JavaScript room too", () => {
+  const src =
+    "const btn = document.querySelector('button');\nbtn.addEventListener('click', () => btn.blur());\n";
+  const r = service.rename(src, src.indexOf("btn"), "js");
+  assert(r.ok);
+  assertEquals(r.ranges.length, 3);
+  // and the TypeScript file is untouched by it (completions still from the TS text)
+  assert(service.completions("document.", 9, ".")!.entries.some((e) => e.name === "body"));
+});

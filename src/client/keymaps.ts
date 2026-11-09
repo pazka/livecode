@@ -9,7 +9,7 @@ import { foldKeymap } from "@codemirror/language";
 import { searchKeymap } from "@codemirror/search";
 import type { KeyBinding } from "@codemirror/view";
 import { COMMAND_BY_ID, MANAGED_RUNS } from "./commands.ts";
-import { canonical, IS_MAC } from "./keys.ts";
+import { canonical, IS_MAC, type MouseMods } from "./keys.ts";
 
 export type PresetId = "vscode" | "jetbrains" | "sublime" | "vim" | "emacs";
 export type Bindings = Record<string, string[]>;
@@ -20,6 +20,12 @@ export interface Preset {
   /** Modal extension that owns most keys inside the editor. */
   ext: "vim" | "emacs" | null;
   bindings: Bindings;
+  /**
+   * Multiple cursors with the mouse, as in that editor: click with `addCursor` adds a cursor (Mod+click too, in
+   * every preset), drag with `column` selects a column (a box). VS Code: Alt+click, Shift+Alt+drag; JetBrains:
+   * Alt+Shift+click, Alt+drag; others: CodeMirror's Mod+click, Alt+drag.
+   */
+  mouse: { addCursor: MouseMods; column: MouseMods };
 }
 
 // App commands that read the same in most presets.
@@ -77,6 +83,7 @@ const NO_EDITOR: Bindings = {
   reindent: [],
   startCompletion: [],
   showType: [],
+  renameSymbol: [],
   selectAll: [],
   selectLine: [],
   selectNextOccurrence: [],
@@ -103,6 +110,7 @@ export const PRESETS: Preset[] = [
     id: "vscode",
     label: "VS Code",
     ext: null,
+    mouse: { addCursor: "Alt", column: "Alt-Shift" },
     bindings: {
       ...NO_EDITOR,
       ...COMMON_APP,
@@ -120,6 +128,7 @@ export const PRESETS: Preset[] = [
       reindent: ["Shift-Alt-f"],
       startCompletion: ["Ctrl-Space"],
       showType: ["Mod-k Mod-i"],
+      renameSymbol: ["F2"],
       selectAll: ["Mod-a"],
       selectLine: ["Mod-l"],
       selectNextOccurrence: ["Mod-d"],
@@ -151,6 +160,7 @@ export const PRESETS: Preset[] = [
     id: "jetbrains",
     label: "JetBrains (IntelliJ, WebStorm…)",
     ext: null,
+    mouse: { addCursor: "Alt-Shift", column: "Alt" },
     bindings: {
       ...NO_EDITOR,
       ...COMMON_APP,
@@ -165,6 +175,7 @@ export const PRESETS: Preset[] = [
       insertBlankLine: ["Shift-Enter"],
       reindent: ["Mod-Alt-l"],
       startCompletion: ["Ctrl-Space"],
+      renameSymbol: ["Shift-F6"],
       selectAll: ["Mod-a"],
       selectNextOccurrence: ["Alt-j"],
       selectAllOccurrences: ["Mod-Alt-Shift-j"],
@@ -197,6 +208,7 @@ export const PRESETS: Preset[] = [
     id: "sublime",
     label: "Sublime Text",
     ext: null,
+    mouse: { addCursor: "Mod", column: "Alt" },
     bindings: {
       ...NO_EDITOR,
       ...COMMON_APP,
@@ -238,6 +250,7 @@ export const PRESETS: Preset[] = [
     id: "vim",
     label: "Vim",
     ext: "vim",
+    mouse: { addCursor: "Mod", column: "Alt" },
     bindings: {
       ...NO_EDITOR,
       ...COMMON_APP,
@@ -250,6 +263,7 @@ export const PRESETS: Preset[] = [
     id: "emacs",
     label: "Emacs",
     ext: "emacs",
+    mouse: { addCursor: "Mod", column: "Alt" },
     bindings: {
       ...NO_EDITOR,
       ...COMMON_APP,

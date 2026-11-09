@@ -37,6 +37,7 @@ import { foldAll, foldCode, indentRange, unfoldAll, unfoldCode } from "@codemirr
 import { startCompletion } from "@codemirror/autocomplete";
 import type { Command as CMCommand } from "@codemirror/view";
 import { showTypeAtCursor } from "./ts/client.ts";
+import { renameSymbol } from "./rename.ts";
 import { announce } from "./ui/dom.ts";
 
 /**
@@ -108,6 +109,7 @@ export const EDITOR_COMMANDS: EditorCommand[] = [
     "Edit",
     (view) => showTypeAtCursor(view, announce),
   ),
+  ed("renameSymbol", "Rename (every use of the name)", "Edit", (view) => renameSymbol(view, announce)),
   ed("selectAll", "Select all", "Selection", selectAll),
   ed("selectLine", "Select line", "Selection", selectLine),
   ed("selectNextOccurrence", "Add next occurrence to selection", "Selection", selectNextOccurrence),

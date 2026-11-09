@@ -2,7 +2,14 @@
 // y-codemirror (remote cursors + selections from the shared awareness). Undo is CodeMirror's own history,
 // with remote changes kept out of it (you only undo your own edits) — vim's `u` and emacs' undo use it too.
 
-import { Compartment, EditorState, type Extension, Prec, Transaction } from "@codemirror/state";
+import {
+  Compartment,
+  EditorSelection,
+  EditorState,
+  type Extension,
+  Prec,
+  Transaction,
+} from "@codemirror/state";
 import {
   crosshairCursor,
   drawSelection,
@@ -49,6 +56,8 @@ import { errorDisplay } from "./diagnostics.ts";
 import { fallbackKeymap, PRESET_BY_ID, type PresetId } from "./keymaps.ts";
 import { editorTheme, highlightStyle } from "./themes.ts";
 import { tsClient, tsCompletionSource, typescriptEditor, typescriptSupport } from "./ts/client.ts";
+import { renameExtension } from "./rename.ts";
+import { type MouseMods, mouseMods } from "./keys.ts";
 
 /** The script's language, shared by the room (meta "jsLang"). */
 export type ScriptLang = "js" | "ts";
@@ -80,6 +89,7 @@ function languageExtension(f: FileId, lang: ScriptLang, texts: FileTexts): Exten
         typescriptEditor(tsClient()),
       ]
       : [],
+    renameExtension(f, ts ? "ts" : "js"),
     EditorView.contentAttributes.of({
       "aria-label": `${
         f === "js" ? (ts ? "TypeScript" : "JavaScript") : FILE_LABELS[f]
@@ -220,8 +230,6 @@ export class SharedEditor {
         bracketMatching(),
         closeBrackets(),
         autocompletion(),
-        rectangularSelection(),
-        crosshairCursor(),
         highlightActiveLine(),
         selectionClass,
         highlightSelectionMatches(),
@@ -277,10 +285,51 @@ function tabExtension(size: number): Extension {
   return [EditorState.tabSize.of(size), indentUnit.of(" ".repeat(size))];
 }
 
-/** vim / emacs own the keys inside the editor first (Prec.highest); other presets add nothing here. */
+/**
+ * The preset's own editor behaviour: vim / emacs own the keys inside the editor first (Prec.highest), and
+ * the mouse makes multiple cursors the way that editor does (mouseExtension).
+ */
 function modalExtension(preset: PresetId): Extension {
-  const ext = PRESET_BY_ID.get(preset)?.ext;
-  if (ext === "vim") return Prec.highest(vim({ status: true }));
-  if (ext === "emacs") return Prec.highest(emacs());
-  return [];
+  const p = PRESET_BY_ID.get(preset) ?? PRESET_BY_ID.get("vscode")!;
+  const mouse = mouseExtension(p.mouse);
+  if (p.ext === "vim") return [Prec.highest(vim({ status: true })), mouse];
+  if (p.ext === "emacs") return [Prec.highest(emacs()), mouse];
+  return mouse;
+}
+
+/** Alt+Shift+click (JetBrains): a caret added where clicked, or the caret there removed. */
+function addCaretClick(e: MouseEvent, view: EditorView): boolean {
+  if (e.button !== 0 || !mouseMods(e, "Alt-Shift")) return false;
+  const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+  if (pos === null) return false;
+  e.preventDefault();
+  const sel = view.state.selection;
+  const at = sel.ranges.findIndex((r) => r.empty && r.head === pos);
+  view.dispatch({
+    selection: at >= 0 && sel.ranges.length > 1
+      ? EditorSelection.create(
+        sel.ranges.filter((_, i) => i !== at),
+        Math.max(0, sel.mainIndex - (at < sel.mainIndex ? 1 : 0)) % (sel.ranges.length - 1),
+      )
+      : sel.addRange(EditorSelection.cursor(pos)),
+    userEvent: "select.pointer",
+  });
+  view.focus();
+  return true;
+}
+
+/**
+ * Multiple cursors with the mouse: a click with the preset's modifier adds a cursor (Mod+click too, in every
+ * preset), a drag with its column modifier selects a column (a box, one cursor per line).
+ */
+function mouseExtension(m: { addCursor: MouseMods; column: MouseMods }): Extension {
+  return [
+    EditorView.clickAddsSelectionRange.of((e) => mouseMods(e, m.addCursor) || mouseMods(e, "Mod")),
+    // with Shift in the gesture (JetBrains Alt+Shift+click), CodeMirror would extend the selection instead:
+    // add (or, on an existing caret, remove) the caret here ourselves
+    m.addCursor === "Alt-Shift" ? EditorView.domEventHandlers({ mousedown: addCaretClick }) : [],
+    rectangularSelection({ eventFilter: (e) => e.button === 0 && mouseMods(e, m.column) }),
+    // the crosshair tells a column drag is ready (only where one key alone means it)
+    m.column === "Alt" ? crosshairCursor({ key: "Alt" }) : [],
+  ];
 }

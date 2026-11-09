@@ -15,6 +15,8 @@ export const LIB_ROOTS = [
 ] as const;
 
 const SCRIPT = "/script.ts";
+/** The script of a JavaScript room (rename only): read as JavaScript, never type-checked. */
+const SCRIPT_JS = "/script.js";
 const ENV = "/livecode-env.d.ts";
 const LIB_DIR = "/lib/";
 /** Imports from a URL (`import confetti from "https://esm.sh/canvas-confetti"`) are typed `any`. */
@@ -58,6 +60,21 @@ export interface TypeError {
   code: number;
 }
 
+export type RenameResult =
+  | {
+    ok: true;
+    /** The name as it is now. */
+    name: string;
+    /** TypeScript's kind of the symbol (`const`, `function`, `class`, `property` …). */
+    kind: string;
+    /** The span the caret is in. */
+    from: number;
+    to: number;
+    /** Every place to rename, in order. */
+    ranges: { from: number; to: number }[];
+  }
+  | { ok: false; message: string };
+
 export interface Transpiled {
   js: string;
   /** Source map (v3) of `js` back to the TypeScript text. */
@@ -67,6 +84,8 @@ export interface Transpiled {
 export class ScriptService {
   private text = "";
   private version = 0;
+  private jsText = "";
+  private jsVersion = 0;
   private readonly ls: TS.LanguageService;
   private readonly snapshots = new Map<string, TS.IScriptSnapshot>();
   private readonly options: TS.CompilerOptions;
@@ -84,12 +103,15 @@ export class ScriptService {
       noEmit: true,
       skipLibCheck: true,
       isolatedModules: true,
-      allowJs: false,
+      allowJs: true,
+      checkJs: false,
       types: [],
     };
     const read = (f: string): string | undefined =>
       f === SCRIPT
         ? this.text
+        : f === SCRIPT_JS
+        ? this.jsText
         : f === ENV
         ? ENV_SOURCE
         : f.startsWith(LIB_DIR)
@@ -97,10 +119,13 @@ export class ScriptService {
         : undefined;
     const host: TS.LanguageServiceHost = {
       getCompilationSettings: () => this.options,
-      getScriptFileNames: () => [SCRIPT, ENV],
-      getScriptVersion: (f) => (f === SCRIPT ? String(this.version) : "0"),
+      getScriptFileNames: () => [SCRIPT, SCRIPT_JS, ENV],
+      getScriptVersion: (
+        f,
+      ) => (f === SCRIPT ? String(this.version) : f === SCRIPT_JS ? String(this.jsVersion) : "0"),
       getScriptSnapshot: (f) => {
         if (f === SCRIPT) return ts.ScriptSnapshot.fromString(this.text);
+        if (f === SCRIPT_JS) return ts.ScriptSnapshot.fromString(this.jsText);
         let s = this.snapshots.get(f);
         if (!s) {
           const t = read(f);
@@ -126,6 +151,39 @@ export class ScriptService {
       this.text = text;
       this.version++;
     }
+  }
+
+  /**
+   * Rename the symbol at `pos`: every place it is used in the script (scope-aware: another `x` elsewhere is
+   * not touched), or why it can't be renamed (a keyword, something of the browser's own types …).
+   */
+  rename(text: string, pos: number, lang: "ts" | "js" = "ts"): RenameResult {
+    let file = SCRIPT;
+    if (lang === "js") {
+      file = SCRIPT_JS;
+      if (text !== this.jsText) {
+        this.jsText = text;
+        this.jsVersion++;
+      }
+    } else this.use(text);
+    const info = this.ls.getRenameInfo(file, pos, { allowRenameOfImportPath: false });
+    if (!info.canRename) return { ok: false, message: info.localizedErrorMessage };
+    const locs = this.ls.findRenameLocations(file, pos, false, false, {
+      providePrefixAndSuffixTextForRename: false,
+    });
+    const ranges = (locs ?? [])
+      .filter((l) => l.fileName === file)
+      .map((l) => ({ from: l.textSpan.start, to: l.textSpan.start + l.textSpan.length }))
+      .sort((a, b) => a.from - b.from);
+    if (!ranges.length) return { ok: false, message: "Nothing to rename here" };
+    return {
+      ok: true,
+      name: info.displayName,
+      kind: info.kind,
+      from: info.triggerSpan.start,
+      to: info.triggerSpan.start + info.triggerSpan.length,
+      ranges,
+    };
   }
 
   /** Completions at `pos` (an offset in `text`). */

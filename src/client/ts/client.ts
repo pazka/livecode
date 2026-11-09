@@ -165,7 +165,10 @@ export function typeBox(display: string, docs: string): HTMLElement {
   box.append(code);
   if (docs) {
     const p = document.createElement("p");
-    p.textContent = docs.replace(/\*\*`?|`?\*\*/g, "").slice(0, 600);
+    p.textContent = docs
+      .replace(/\*\*`?|`?\*\*/g, "")
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, "$1") // markdown links: their text
+      .slice(0, 600);
     box.append(p);
   }
   return box;
