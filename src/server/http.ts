@@ -182,7 +182,8 @@ async function route(
     return a ? serveAsset(req, a, PREVIEW_HEADERS, head) : text("not found", 404, head);
   }
   if (path === "/" || path.startsWith("/r/")) {
-    if (path !== "/" && !isRoomId(path.slice(3))) {
+    // /r/<room> (the editor) and /r/<room>/view (the preview screen): the same page
+    if (path !== "/" && !isRoomId(path.slice(3).replace(/\/view$/, ""))) {
       return text("not found: room names are a-z, 0-9 and -", 404, head);
     }
     const a = assets.get("/index.html");

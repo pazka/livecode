@@ -33,9 +33,26 @@ Deno.test({
       const room = await fetch(`${srv.base}/r/my-room`);
       assertEquals(room.status, 200);
       assert((await room.text()).includes('id="app"'));
+      // the preview screen of a room: the same page, same headers
+      const view = await fetch(`${srv.base}/r/my-room/view`);
+      assertEquals(view.status, 200);
+      assertEquals(view.headers.get("x-frame-options"), "DENY");
+      assert((await view.text()).includes('id="app"'));
 
       for (
-        const bad of ["/r/AB", "/r/x", "/r/-abc", "/r/abc--def", "/r/a_b_c", "/.env", "/.git/config", "/nope"]
+        const bad of [
+          "/r/AB",
+          "/r/x",
+          "/r/AB/view",
+          "/r/my-room/view/x",
+          "/r/my-room/edit",
+          "/r/-abc",
+          "/r/abc--def",
+          "/r/a_b_c",
+          "/.env",
+          "/.git/config",
+          "/nope",
+        ]
       ) {
         const r = await fetch(`${srv.base}${bad}`);
         await r.body?.cancel();

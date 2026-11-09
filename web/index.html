@@ -185,6 +185,9 @@
           <span id="preview-status" class="muted" aria-live="polite"></span>
         </div>
         <span class="spacer"></span>
+        <a id="preview-popout" class="button icon-btn" href="#" target="_blank" rel="noopener"
+          aria-label="Open the preview in a new tab (another screen, fullscreen there)" title="Open the preview in a new tab — put it on another screen, fullscreen"><svg
+            class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5L7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/></svg></a>
         <button type="button" id="console-btn" class="icon-btn with-count" aria-expanded="false" aria-controls="console"
           aria-label="Console">
           <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M4.5 6l2 2-2 2M8 10.5h3.5"/></svg>
@@ -338,6 +341,23 @@
     <div id="help-list"></div>
   </form>
 </dialog>
+
+<!-- Preview screen (/r/<room>/view): the page only, full window, live -->
+<main id="viewer" class="viewer" hidden aria-label="Live preview of the room's page">
+  <div id="viewer-frames" class="preview-frames viewer-frames"></div>
+  <div id="viewer-bar" class="viewer-bar glass" role="toolbar" aria-label="Preview screen">
+    <span id="viewer-status" class="status" aria-live="polite">Connecting…</span>
+    <span id="viewer-room" class="viewer-room"></span>
+    <button type="button" id="viewer-run" class="icon-btn" aria-label="Run the page again" title="Run again"><svg
+        class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5z"/></svg></button>
+    <button type="button" id="viewer-fullscreen" class="icon-btn" aria-pressed="false" aria-label="Fullscreen"
+      title="Fullscreen"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path
+          d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg></button>
+    <a id="viewer-editor" class="button icon-btn" href="/" aria-label="Open the editor" title="Open the editor"><svg class="i"
+        viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4.5L2.5 8 6 11.5M10 4.5l3.5 3.5-3.5 3.5"/></svg></a>
+  </div>
+  <div id="banner-viewer" class="banner glass viewer-banner" role="alert" hidden></div>
+</main>
 
 <div id="live" class="sr-only" aria-live="polite"></div>
 </body>

@@ -8,7 +8,6 @@ import { searchPanelOpen } from "@codemirror/search";
 import { Vim } from "@replit/codemirror-vim";
 import { type FileId, FILES, isRoomId, MAX_FILE_CHARS, type Notice } from "../shared/protocol.ts";
 import { ALL_COMMANDS, APP_COMMANDS, COMMAND_BY_ID } from "./commands.ts";
-import { composeDocument } from "./compose.ts";
 import { addShownErrors, type CodeError, cssErrors, errorCount, showErrors } from "./diagnostics.ts";
 import { FILE_LABELS, FILE_NAMES, type ScriptLang, setScriptNames, SharedEditor } from "./editors.ts";
 import {
@@ -23,7 +22,7 @@ import {
 } from "./panes.ts";
 import { ariaShortcut, displayBinding, eventStrokes } from "./keys.ts";
 import { effectiveBindings, isPlainKey, makeMatcher, type Matcher, PRESETS } from "./keymaps.ts";
-import { type Built, type ConsoleEntry, Preview, previousRunFroze } from "./preview.ts";
+import { type ConsoleEntry, Preview, previousRunFroze } from "./preview.ts";
 import { RoomProvider, type Status } from "./provider.ts";
 import { type Settings, SettingsStore } from "./settings.ts";
 import { resolveTheme, THEME_CHOICES, THEMES } from "./themes.ts";
@@ -31,7 +30,8 @@ import { $, announce, h } from "./ui/dom.ts";
 import { Palette, type PaletteItem } from "./ui/palette.ts";
 import { SettingsDialog } from "./ui/settingsDialog.ts";
 import { tsClient } from "./ts/client.ts";
-import { sourceLookup } from "./ts/sourcemap.ts";
+import { buildPage, isViewer, previewChannel, type PreviewMessage, viewerTarget, viewerUrl } from "./page.ts";
+import { startViewer } from "./viewer.ts";
 
 const settings = new SettingsStore();
 
@@ -67,7 +67,9 @@ function rememberRoom(id: string) {
 
 // ---------- route ----------
 const m = location.pathname.match(/^\/r\/([^/]+)\/?$/);
+const v = location.pathname.match(/^\/r\/([^/]+)\/view\/?$/);
 if (m && isRoomId(m[1])) startRoom(m[1]);
+else if (v && isRoomId(v[1])) startViewer(v[1], settings);
 else startLanding();
 
 function startLanding() {
@@ -137,10 +139,14 @@ function startRoom(roomId: string) {
   const awareness = provider.awareness;
 
   function renderStatus(s: Status = provider.status) {
-    const n = awareness.getStates().size;
+    const all = [...awareness.getStates().values()];
+    const n = all.filter((st) => !isViewer(st)).length;
+    const screens = all.length - n;
     statusEl.dataset.state = s;
     statusEl.textContent = s === "online"
-      ? `Connected · ${n} ${n === 1 ? "person" : "people"}`
+      ? `Connected · ${n} ${n === 1 ? "person" : "people"}${
+        screens ? ` · ${screens} preview ${screens === 1 ? "screen" : "screens"}` : ""
+      }`
       : s === "connecting"
       ? "Connecting…"
       : s === "offline"
@@ -530,22 +536,7 @@ function startRoom(roomId: string) {
   const consoleEntries: ConsoleEntry[] = hook.console;
   let unseenErrors = 0;
   let lastRenderAt = 0;
-  /** The page: the three files as they are, or with the TypeScript turned into JavaScript first (worker). */
-  function buildPage(): Built | Promise<Built> {
-    const src = {
-      html: texts.html.toString(),
-      css: texts.css.toString(),
-      js: texts.js.toString(),
-      jsModule: meta.get("jsModule") === true,
-    };
-    if (scriptLang() !== "ts" || !src.js.trim()) return { html: composeDocument(src) };
-    return tsClient().call("transpile", src.js).then((t) => ({
-      html: composeDocument({ ...src, js: t.js }),
-      toSource: sourceLookup(t.map),
-      label: "TS",
-    }));
-  }
-  const preview = new Preview($("preview-frames"), buildPage, {
+  const preview = new Preview($("preview-frames"), () => buildPage(texts, meta), {
     console: (e) => addConsole(e),
     started: () => {
       pendingJsErrors = [];
@@ -673,6 +664,17 @@ function startRoom(roomId: string) {
     previewPaused = false;
     preview.render(true);
     setPreviewStatus();
+    // the person's preview screens (other tabs / windows of this browser) run again too
+    channel?.postMessage({ room: roomId, type: "run" } satisfies PreviewMessage);
+  }
+  const channel = previewChannel();
+
+  // --- preview screen: the page alone in another tab (another screen, fullscreen) ---
+  const popout = $<HTMLAnchorElement>("preview-popout");
+  popout.href = viewerUrl(roomId);
+  popout.target = viewerTarget(roomId);
+  function openPreviewScreen() {
+    open(viewerUrl(roomId), viewerTarget(roomId), "noopener");
   }
 
   $("run-btn").addEventListener("click", runPreview);
@@ -744,9 +746,31 @@ function startRoom(roomId: string) {
     const dots: Record<FileId, HTMLElement[]> = { html: [], css: [], js: [] };
     const entries = [...states.entries()].sort(([a], [b]) => (a === me ? -1 : b === me ? 1 : a - b));
     const hidden: string[] = [];
+    const eyes: HTMLElement[] = [];
     for (const [id, st] of entries) {
       const u = st.user as { name?: string; color?: string } | undefined;
       if (!u?.name) continue;
+      if (isViewer(st)) {
+        // a preview screen: an eye in its owner's colour, after the people — no cursor, no file, not counted
+        const label = `${u.name}'s preview screen`;
+        names.set(id, label);
+        eyes.push(h(
+          "li",
+          {},
+          h(
+            "span",
+            {
+              class: "avatar viewer-eye",
+              role: "img",
+              "aria-label": label,
+              title: label,
+              style: `--eye:${u.color}`,
+            },
+            eyeIcon(),
+          ),
+        ));
+        continue;
+      }
       names.set(id, u.name);
       const f = (FILES as readonly string[]).includes(st.file) ? st.file as FileId : "html";
       const self = id === me;
@@ -785,7 +809,7 @@ function startRoom(roomId: string) {
         }),
       ));
     }
-    peersEl.replaceChildren(...items);
+    peersEl.replaceChildren(...items, ...eyes.slice(0, 3));
     for (const f of FILES) {
       $(`tab-${f}`).querySelector(".dots")!.replaceChildren(...dots[f]);
       paneEl(f).querySelector(".pane-head .dots")!.replaceChildren(...dots[f].map((d) => d.cloneNode()));
@@ -798,10 +822,14 @@ function startRoom(roomId: string) {
     renderPeers();
     if (origin === "local") return;
     const me = doc.clientID;
-    const joined = ch.added.filter((id) => id !== me).map((id) => names.get(id)).filter(Boolean);
-    const left = ch.removed.filter((id) => id !== me).map((id) => names.get(id)).filter(Boolean);
-    if (joined.length) announce(`${joined.join(", ")} joined`);
-    if (left.length) announce(`${left.join(", ")} left`);
+    const said = (ids: number[]) => ids.filter((id) => id !== me).map((id) => names.get(id)).filter(Boolean);
+    const isScreen = (n?: string) => !!n?.endsWith("'s preview screen");
+    const joined = said(ch.added), left = said(ch.removed);
+    const people = (l: (string | undefined)[], screens: boolean) => l.filter((n) => isScreen(n) === screens);
+    if (people(joined, false).length) announce(`${people(joined, false).join(", ")} joined`);
+    if (people(left, false).length) announce(`${people(left, false).join(", ")} left`);
+    if (people(joined, true).length) announce(`${people(joined, true).join(", ")} opened`);
+    if (people(left, true).length) announce(`${people(left, true).join(", ")} closed`);
     for (const id of ch.removed) names.delete(id);
   });
   peersEl.addEventListener("click", (e) => {
@@ -811,6 +839,20 @@ function startRoom(roomId: string) {
     if (id === doc.clientID) return dialog.open("profile");
     jumpTo(id);
   });
+
+  function eyeIcon(): SVGSVGElement {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("class", "i");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("aria-hidden", "true");
+    const p = document.createElementNS(ns, "path");
+    p.setAttribute("d", "M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z");
+    const c = document.createElementNS(ns, "circle");
+    for (const [k, val] of [["cx", "8"], ["cy", "8"], ["r", "2"]]) c.setAttribute(k, val);
+    svg.append(p, c);
+    return svg;
+  }
 
   function jumpTo(clientId: number) {
     const st = awareness.getStates().get(clientId);
@@ -921,6 +963,7 @@ function startRoom(roomId: string) {
     tabHtml: () => selectTab("html", true),
     tabCss: () => selectTab("css", true),
     tabJs: () => selectTab("js", true),
+    previewScreen: () => openPreviewScreen(),
     toggleTypeScript: () => meta.set("jsLang", scriptLang() === "ts" ? "js" : "ts"),
     // several files shown: next / previous go through them in their order; one shown: through all files
     nextTab: () => selectTab(cycle(1), true),
@@ -1275,7 +1318,8 @@ function startRoom(roomId: string) {
           texts[f].delete(0, texts[f].length);
           texts[f].insert(0, s);
         }),
-      peers: () => awareness.getStates().size,
+      peers: () => [...awareness.getStates().values()].filter((st) => !isViewer(st)).length,
+      previewScreens: () => [...awareness.getStates().values()].filter((st) => isViewer(st)).length,
       theme: () => document.documentElement.dataset.theme,
       keymap: () => settings.get().keymap,
       themes: THEMES.map((t) => t.id),

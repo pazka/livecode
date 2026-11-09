@@ -136,6 +136,7 @@ export const APP_COMMANDS: AppCommand[] = [
   app("clearConsole", "Clear the console", "Preview"),
   app("toggleKeepConsole", "Keep console content between runs (on / off)", "Preview"),
   app("focusPreview", "Focus the preview", "Preview"),
+  app("previewScreen", "Open the preview in a new tab (another screen, fullscreen)", "Preview"),
   app("tabHtml", "Edit HTML", "Files"),
   app("tabCss", "Edit CSS", "Files"),
   app("tabJs", "Edit the script", "Files"),

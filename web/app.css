@@ -682,3 +682,26 @@ legend { font-weight: 700; font-size: 1.15rem; padding: 0.6rem 0 0.4rem; }
   .avatar, .tabs .dots i, .pane-head .dots i, .status::before, .project-badge { forced-color-adjust: none; }
   .glass, .island { border: 1px solid CanvasText; }
 }
+
+/* ---------- preview screen (/r/<room>/view): the page only, full window ---------- */
+.viewer { position: fixed; inset: 0; background: Canvas; }
+.viewer-frames { position: absolute; inset: 0; }
+.viewer-bar {
+  position: fixed; top: 0.6rem; right: 0.6rem; z-index: 5; display: flex; align-items: center; gap: 0.25rem;
+  padding: 0.25rem 0.35rem; border-radius: var(--r-lg); font-size: 0.85rem;
+  opacity: 0.08; transition: opacity 0.3s var(--ease);
+}
+.viewer-bar.awake, .viewer-bar:hover, .viewer-bar:focus-within { opacity: 1; }
+.fullscreen .viewer-bar:not(.awake):not(:hover):not(:focus-within) { opacity: 0; }
+.viewer-room { font-family: var(--mono); color: var(--muted); padding: 0 0.25rem; }
+.viewer-banner { position: fixed; left: 50%; bottom: 1rem; transform: translateX(-50%); z-index: 5; }
+@media (prefers-reduced-motion: reduce) { .viewer-bar { transition: none; } }
+
+/* a preview screen in the people list: an eye in its owner's colour, not a person */
+.avatar.viewer-eye {
+  display: inline-grid; place-items: center; background: var(--bg); border-color: var(--panel);
+  box-shadow: inset 0 0 0 2px var(--eye, var(--muted)); color: var(--fg); cursor: default;
+}
+.avatar.viewer-eye:hover { transform: none; }
+.avatar.viewer-eye .i { width: 0.95rem; height: 0.95rem; }
+.viewing .skip-link, .viewing .backdrop { display: none; }
