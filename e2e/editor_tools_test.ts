@@ -276,6 +276,17 @@ Deno.test({
         await a.click("#ts-toggle");
       });
 
+      await check("completion: Tab the moment the list appears, then typing at once (5 times)", async () => {
+        for (let i = 0; i < 5; i++) {
+          await reset(a, "html", "");
+          await a.keyboard.type("div");
+          await a.waitForSelector("#panel-html .cm-tooltip-autocomplete", { timeout: 3000 });
+          await a.keyboard.press("Tab"); // within CodeMirror's 75 ms interaction delay
+          await a.keyboard.type("in"); // no pause: a deferred accept would miss
+          await expectText(a, "html", "<div>in</div>", `try ${i + 1}`);
+        }
+      });
+
       await settings(a, { keymap: "jetbrains" });
       await check("JetBrains: Shift+F6 renames; Escape cancels", async () => {
         await reset(a, "js", SCOPED);

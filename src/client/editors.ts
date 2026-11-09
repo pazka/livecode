@@ -36,6 +36,7 @@ import {
   acceptCompletion,
   autocompletion,
   closeBrackets,
+  closeCompletion,
   completionStatus,
   selectedCompletion,
 } from "@codemirror/autocomplete";
@@ -133,14 +134,32 @@ function fileLimit(onRefused: () => void) {
  */
 const tabAcceptsCompletion = Prec.highest(keymap.of([{
   key: "Tab",
+  // at once, however fresh the list (no retry later: a key typed meanwhile would make it miss)
+  run: (view) =>
+    completionStatus(view.state) === "active" && !!selectedCompletion(view.state) && acceptCompletion(view),
+}, {
+  key: "Enter",
+  // Enter right as the list pops up (typing fast) is a new line, not the suggestion — CodeMirror's own
+  // interaction delay, kept for Enter only (Tab above takes the suggestion at once)
   run: (view) => {
-    if (completionStatus(view.state) !== "active" || !selectedCompletion(view.state)) return false;
-    if (acceptCompletion(view)) return true;
-    // the list opened less than CodeMirror's interaction delay (75 ms) ago: take it right after that
-    setTimeout(() => acceptCompletion(view), 90);
-    return true;
+    if (
+      completionStatus(view.state) !== "active" || Date.now() - (listOpenedAt.get(view) ?? 0) >= ENTER_DELAY
+    ) {
+      return false;
+    }
+    closeCompletion(view);
+    return false;
   },
 }]));
+
+/** When each editor's completion list last opened (for the Enter delay). */
+const listOpenedAt = new WeakMap<EditorView, number>();
+const ENTER_DELAY = 75;
+const trackListOpening = EditorView.updateListener.of((u) => {
+  if (completionStatus(u.state) === "active" && completionStatus(u.startState) !== "active") {
+    listOpenedAt.set(u.view, Date.now());
+  }
+});
 
 /**
  * Remote carets that crowd together (another caret, or mine, within CROWD_DISTANCE characters on the same
@@ -229,7 +248,8 @@ export class SharedEditor {
         syntaxHighlighting(highlightStyle),
         bracketMatching(),
         closeBrackets(),
-        autocompletion(),
+        autocompletion({ interactionDelay: 0 }), // Tab / Enter timing: tabAcceptsCompletion
+        trackListOpening,
         highlightActiveLine(),
         selectionClass,
         highlightSelectionMatches(),
