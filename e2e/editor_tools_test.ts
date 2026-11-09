@@ -94,8 +94,6 @@ async function wordPoint(p: Page, f: F, word: string, nth = 0, at = 0.5) {
   return pt;
 }
 
-const cursors = (p: Page, f: F) => p.locator(`#panel-${f} .cm-cursorLayer .cm-cursor`).count();
-
 interface Result {
   name: string;
   ok: boolean;
@@ -211,7 +209,12 @@ Deno.test({
         await a.keyboard.down("Alt");
         await a.mouse.click(g.x + 1, g.y);
         await a.keyboard.up("Alt");
-        if ((await cursors(a, "html")) !== 2) throw new Error(`${await cursors(a, "html")} cursors`);
+        // CodeMirror draws the new cursor on its next frame: poll, don't read once
+        await expectTrue(
+          a,
+          `document.querySelectorAll("#panel-html .cm-cursorLayer .cm-cursor").length === 2`,
+          "2 cursors",
+        );
         await a.keyboard.type(">");
         await expectText(a, "html", ">alpha\nbeta\n>gamma\n");
       });
