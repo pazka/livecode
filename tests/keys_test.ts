@@ -65,6 +65,43 @@ Deno.test("keys: no shortcut swallowing on other layouts (owner X.18)", () => {
   assert(eventStrokes(ev("ф", "KeyA", { ctrl: true })).includes("Ctrl-a"));
 });
 
+Deno.test('keys: macOS Option characters are text (French Mac ⌥⇧5 = "[" never switches the file)', () => {
+  const mac = true;
+  // French (AZERTY) Mac: [ ] { } | \ ~ are typed with Option
+  for (
+    const [key, code, shift] of [
+      ["[", "Digit5", true],
+      ["]", "Minus", true],
+      ["{", "Digit5", false],
+      ["}", "Minus", false],
+      ["|", "KeyL", true],
+      ["\\", "Period", true],
+      ["~", "KeyN", false],
+    ] as const
+  ) {
+    assertEquals(
+      eventStrokes(ev(key, code, { alt: true, shift }), mac),
+      [],
+      `⌥${shift ? "⇧" : ""}${code} → ${key}`,
+    );
+  }
+  // French-PC layout on a Mac: ⌥2 = "~", ⌥3 = "#" (not the Alt-2 / Alt-3 file keys)
+  assertEquals(eventStrokes(ev("~", "Digit2", { alt: true }), mac), []);
+  assertEquals(eventStrokes(ev("#", "Digit3", { alt: true }), mac), []);
+  // …while "Alt-[" / "Alt-]" really are bound (previous / next file): they are only reached from the
+  // physical [ ] keys, as on a US Mac
+  const m = makeMatcher(effectiveBindings("vscode", {}), mac);
+  assertEquals(m.get("Alt-["), "prevTab");
+  assertEquals(m.get("Alt-]"), "nextTab");
+  // US Mac: Option characters code never needs still reach the physical key's shortcut
+  assert(eventStrokes(ev("¡", "Digit1", { alt: true }), mac).includes("Alt-1"));
+  assert(eventStrokes(ev("“", "BracketLeft", { alt: true }), mac).includes("Alt-["));
+  // ⌘ / ⌃ with Option is a shortcut, whatever it types
+  assert(eventStrokes(ev("[", "BracketLeft", { alt: true, meta: true }), mac).length > 0);
+  // Windows / Linux: plain Alt (no AltGr) stays a shortcut
+  assert(eventStrokes(ev("[", "BracketLeft", { alt: true }), false).includes("Alt-["));
+});
+
 Deno.test("keys: recorder stores the physical key with Mod", () => {
   assertEquals(recordStroke(ev("P", "KeyP", { ctrl: true, shift: true }), false), "Mod-Shift-p");
   assertEquals(recordStroke(ev("p", "KeyP", { meta: true }), true), "Mod-p");

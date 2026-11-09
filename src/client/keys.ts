@@ -127,12 +127,17 @@ function withMods(key: string, e: KeyEventLike, shift: boolean): string {
  * Canonical names an event can match, most specific first — the same two tries as CodeMirror's keymap:
  * the produced character (Shift folded into it), then the physical key with every modifier.
  */
-export function eventStrokes(e: KeyEventLike): string[] {
+export function eventStrokes(e: KeyEventLike, mac = IS_MAC): string[] {
   if (MODIFIER_KEYS.has(e.key)) return [];
   const isChar = [...e.key].length === 1 && e.key !== " ";
   // AltGr typed a character (Windows reports AltGr as Ctrl+Alt): that is text — "ł", "[", "@" … — never a
   // shortcut (CodeMirror does the same)
   if (isChar && e.getModifierState?.("AltGraph")) return [];
+  // macOS has no AltGr: Option is how a layout types its characters (French ⌥⇧5 = "[", ⌥⇧) = "]", ⌥5 = "{",
+  // ⌥⇧L = "|", ⌥N = "~"; French-PC ⌥2 = "~" …). A printable ASCII character typed with Option (no ⌘ / ⌃) is
+  // what the person meant to type: text, never a shortcut (owner, 2026-11-09: "[" switched the file). Option
+  // characters no code needs ("¡", "“", "∆" on a US Mac) still fall back to the physical key: ⌥1 = Alt-1.
+  if (mac && isChar && e.altKey && !e.ctrlKey && !e.metaKey && /^[\x21-\x7e]$/.test(e.key)) return [];
   const out = [withMods(e.key, e, !isChar)];
   const base = baseKey(e.code);
   // the layout's own letters win: AZERTY Ctrl+Q is Ctrl-q, never the physical key's Ctrl-a. The physical
