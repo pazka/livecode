@@ -79,6 +79,16 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
      console says "TS line N". Imports from a URL are typed `any`; top-level names never clash with the DOM's
      globals (`name`, `status` …).
 
+15. **Preview screen** (owner, 2026-11-09: *"open the live preview in another tab so that I can put it on
+   another screen in fullscreen … it won't count as another user … maybe an eye icon in the list"*): the ↗
+   button in the preview header (or "Open the preview in a new tab" in the palette) opens `/r/<room>/view`:
+   the page alone, full window, live. It joins the room by itself (works without the editor open, follows
+   everyone's edits) with the person's own refresh delay; with auto-refresh off it runs when they press Run
+   in an editor tab (same browser). A small bar (status, Run, **Fullscreen**, back to the editor) fades away
+   and comes back on hover or focus. It is **not a person**: everyone sees an **eye** in its owner's colour
+   after the avatars ("Ada's preview screen"), the status says "2 people · 1 preview screen", no cursor,
+   no file dot; opening / closing it is announced as such. Same tab reused per room.
+
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04; typescript 2026-11-06)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,
 y-codemirror.next, @replit/codemirror-vim, @replit/codemirror-emacs, **typescript 6.0.3** (Microsoft,

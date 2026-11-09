@@ -100,7 +100,9 @@ Worst case on disk: 512 MB (inside the 7-day TTL); in memory: bounded by the RSS
 By hand once (browser): two windows in one room see each other's cursor and name; typing refreshes the
 other's preview; Settings → Theme / Keymap / a shortcut change takes effect at once; the **TypeScript**
 switch above the code turns `script.js` into `script.ts` for both windows, `document.` then lists the DOM's
-members with their types, and a wrong type (`const n: number = "a"`) is marked on its line.
+members with their types, and a wrong type (`const n: number = "a"`) is marked on its line. The ↗ button in the
+preview header opens `/r/<room>/view`: the page alone, live, with a Fullscreen button; the other window shows
+an eye (not a person) in its people list.
 
 ## 4. What runs
 | Item | Value |
