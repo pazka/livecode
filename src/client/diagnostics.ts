@@ -57,6 +57,10 @@ class MessageWidget extends WidgetType {
     return o.text === this.text;
   }
   toDOM() {
+    // a zero-width box at the line's end, the message overflowing it: the caret at the end of the line (End
+    // key: drawn on the widget's side) stays right after the text instead of past the message's margin
+    const box = document.createElement("span");
+    box.className = "cm-lc-errorMsgBox";
     const s = document.createElement("span");
     s.className = "cm-lc-errorMsg";
     s.title = this.text;
@@ -64,7 +68,8 @@ class MessageWidget extends WidgetType {
     sr.className = "sr-only";
     sr.textContent = "Error: ";
     s.append(sr, this.text.length > 140 ? this.text.slice(0, 140) + "…" : this.text);
-    return s;
+    box.append(s);
+    return box;
   }
   override ignoreEvent() {
     return false;

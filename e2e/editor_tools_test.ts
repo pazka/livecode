@@ -290,6 +290,46 @@ Deno.test({
         }
       });
 
+      await check("caret: End on a line with an error message stays right after the text", async () => {
+        await reset(a, "css", "p {\n  color: red\n  margin: 0;\n}\n");
+        await a.click("#run-btn");
+        await a.waitForSelector("#panel-css .cm-lc-errorMsg", { timeout: 8000 });
+        // Run took the focus: back into the editor, line 2, End
+        await a.click("#panel-css .cm-content", { position: { x: 3, y: 8 } });
+        await a.keyboard.press("Control+Home");
+        await a.keyboard.press("ArrowDown");
+        await a.keyboard.press("End");
+        // the caret's x against the end of "red" (text before the message widget)
+        await expectTrue(
+          a,
+          `(() => {
+            const caret = document.querySelector("#panel-css .cm-cursorLayer .cm-cursor");
+            const line = [...document.querySelectorAll("#panel-css .cm-line")][1];
+            const w = document.createTreeWalker(line, NodeFilter.SHOW_TEXT, { acceptNode: (n) =>
+              n.parentElement.closest(".cm-lc-errorMsgBox") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+            let last = null; for (let n = w.nextNode(); n; n = w.nextNode()) last = n;
+            const r = document.createRange(); r.setStart(last, last.length); r.setEnd(last, last.length);
+            return caret && Math.abs(caret.getBoundingClientRect().left - r.getBoundingClientRect().left) < 3;
+          })()`,
+          "caret at the end of the text",
+        );
+      });
+
+      await check("matching bracket: underlined and tinted, no box outline beside the caret", async () => {
+        await reset(a, "js", "Math.abs((1 + 2) * 3);\n");
+        for (let i = 0; i < "Math.abs(".length; i++) await a.keyboard.press("ArrowRight"); // the "(" of "(1 + 2)" next
+        await a.waitForSelector("#panel-js .cm-matchingBracket");
+        const styles: string[][] = await a.evaluate(() =>
+          [...document.querySelectorAll("#panel-js .cm-matchingBracket")].map((e) => {
+            const cs = getComputedStyle(e);
+            return [cs.outlineStyle, cs.textDecorationLine];
+          })
+        );
+        if (!styles.length || styles.some(([o, d]) => o !== "none" || !d.includes("underline"))) {
+          throw new Error(`bracket styles ${JSON.stringify(styles)}`);
+        }
+      });
+
       await settings(a, { keymap: "jetbrains" });
       await check("JetBrains: Shift+F6 renames; Escape cancels", async () => {
         await reset(a, "js", SCOPED);

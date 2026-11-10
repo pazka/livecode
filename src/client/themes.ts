@@ -74,12 +74,21 @@ export const editorTheme = EditorView.theme({
     color: "var(--fg)",
     border: "1px solid var(--ctl)",
   },
+  // the bracket matching the one at the caret: a tint and a thick underline — horizontal only, so it is never
+  // mistaken for the (vertical) caret beside it, as the old box outline was (owner, 2026-11-10); an underline
+  // also survives forced colours, where backgrounds and shadows are dropped
   ".cm-matchingBracket, &.cm-focused .cm-matchingBracket": {
-    outline: "1px solid var(--focus)",
-    backgroundColor: "transparent",
+    outline: "none",
+    backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)",
+    textDecoration: "underline 2px var(--focus)",
+    textUnderlineOffset: "3px",
+    borderRadius: "2px",
   },
   ".cm-nonmatchingBracket, &.cm-focused .cm-nonmatchingBracket": {
-    outline: "1px solid var(--danger)",
+    outline: "none",
+    backgroundColor: "color-mix(in srgb, var(--danger) 16%, transparent)",
+    textDecoration: "underline wavy var(--danger)",
+    textUnderlineOffset: "3px",
   },
   ".cm-searchMatch": { outline: "1px solid var(--warn)", backgroundColor: "transparent" },
   ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--sel)" },
@@ -136,6 +145,7 @@ export const editorTheme = EditorView.theme({
   },
   // a bar at the line's start, not a background: a line background would hide the selection behind it
   ".cm-lc-errorLine": { boxShadow: "inset 3px 0 0 var(--danger)" },
+  ".cm-lc-errorMsgBox": { display: "inline-block", width: "0", whiteSpace: "nowrap", overflow: "visible" },
   ".cm-lc-errorMsg": {
     marginLeft: "1.5em",
     color: "var(--danger)",

@@ -108,6 +108,12 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
    c constant, C class, I interface, T type, E enum, k keyword) — CodeMirror's □ / 𝑥 symbols showed as
    missing-glyph boxes on macOS.
 
+20. **Caret always clear** (owner, 2026-11-10: "trouble distinguishing the cursor from the square highlighting
+   the bracket … when an error is displayed at the end of the line, my cursor seems to move a bit"): the
+   bracket matching the one at the caret is tinted and underlined (horizontal only — never a box whose sides
+   look like a second caret); an error message at the end of a line sits in a zero-width box, so the caret at
+   the line's end (End key) stays right after the text instead of jumping past the message's margin.
+
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04; typescript 2026-11-06)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,
 y-codemirror.next, @replit/codemirror-vim, @replit/codemirror-emacs, **typescript 6.0.3** (Microsoft,
