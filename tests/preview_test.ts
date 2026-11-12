@@ -2,7 +2,7 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { guardLoops } from "../src/client/loopguard.ts";
-import { composeDocument, RUNTIME } from "../src/client/compose.ts";
+import { composeDocument, exportDocument, exportFileName, RUNTIME } from "../src/client/compose.ts";
 
 Deno.test("loop guard: for / while / do-while get a check, lines are kept", () => {
   const src =
@@ -93,4 +93,49 @@ Deno.test("compose: <html> without <head>, and empty files", () => {
   assertStringIncludes(out, "<html><head><script>");
   assert(!out.includes("<style>"));
   assertEquals((out.match(/<script/g) ?? []).length, 1);
+});
+
+Deno.test("export: one file with the three files, nothing of the preview's own", () => {
+  const doc =
+    '<!DOCTYPE html>\n<html lang="en">\n<head>\n<title>t</title>\n</head>\n<body>\n<p>é</p>\n</body>\n</html>\n';
+  const out = exportDocument({
+    html: doc,
+    css: "p{color:red}",
+    js: "while (true) { if (go()) break; }\nconst s = '</script>';",
+    jsModule: true,
+  });
+  // no runtime, no loop guard, no source name, no postMessage to an editor that is not there
+  for (const ours of ["__lc", "postMessage", "sourceURL", "livecode"]) assert(!out.includes(ours), ours);
+  assert(out.startsWith('<!DOCTYPE html>\n<html lang="en">\n<head><style>p{color:red}</style>'), out);
+  assertStringIncludes(out, "<p>é</p>");
+  assertStringIncludes(out, "while (true) { if (go()) break; }"); // as written
+  assertStringIncludes(out, "'<\\/script>'");
+  assert(out.indexOf('<script type="module">') < out.lastIndexOf("</body>"));
+  assert(out.trimEnd().endsWith("</html>"));
+  // the same page the preview shows, minus the runtime
+  const preview = composeDocument({ html: doc, css: "p{color:red}", js: "x()", jsModule: false });
+  const exported = exportDocument({ html: doc, css: "p{color:red}", js: "x()", jsModule: false });
+  assertEquals(
+    preview.replace(`<script>${RUNTIME}</script>`, "").replace("\n//# sourceURL=livecode-script.js", ""),
+    exported,
+  );
+});
+
+Deno.test("export: empty files add nothing; a fragment stays a fragment", () => {
+  assertEquals(exportDocument({ html: "<h1>Hi</h1>", css: " ", js: "\n", jsModule: false }), "<h1>Hi</h1>");
+  assertEquals(
+    exportDocument({ html: "<html><body>x</body></html>", css: "", js: "", jsModule: false }),
+    "<html><body>x</body></html>",
+  );
+  assertEquals(
+    exportDocument({ html: "<h1>Hi</h1>", css: "h1{}", js: "f()", jsModule: false }),
+    "<style>h1{}</style><h1>Hi</h1><script>f()\n</script>",
+  );
+});
+
+Deno.test("export: file name is the room's name", () => {
+  assertEquals(exportFileName("name-of-the-room"), "name-of-the-room.html");
+  assertEquals(exportFileName("k3x9q2m7a1b4"), "k3x9q2m7a1b4.html");
+  assertEquals(exportFileName("My Room!"), "my-room.html");
+  assertEquals(exportFileName("../.."), "page.html");
 });

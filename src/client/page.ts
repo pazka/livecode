@@ -3,24 +3,50 @@
 
 import type * as Y from "yjs";
 import type { FileId } from "../shared/protocol.ts";
-import { composeDocument } from "./compose.ts";
+import { composeDocument, exportDocument, type Sources } from "./compose.ts";
 import type { Built } from "./preview.ts";
 import { tsClient } from "./ts/client.ts";
 import { sourceLookup } from "./ts/sourcemap.ts";
 
+const sourcesOf = (texts: Record<FileId, Y.Text>, meta: Y.Map<unknown>): Sources => ({
+  html: texts.html.toString(),
+  css: texts.css.toString(),
+  js: texts.js.toString(),
+  jsModule: meta.get("jsModule") === true,
+});
+
 export function buildPage(texts: Record<FileId, Y.Text>, meta: Y.Map<unknown>): Built | Promise<Built> {
-  const src = {
-    html: texts.html.toString(),
-    css: texts.css.toString(),
-    js: texts.js.toString(),
-    jsModule: meta.get("jsModule") === true,
-  };
+  const src = sourcesOf(texts, meta);
   if (meta.get("jsLang") !== "ts" || !src.js.trim()) return { html: composeDocument(src) };
   return tsClient().call("transpile", src.js).then((t) => ({
     html: composeDocument({ ...src, js: t.js }),
     toSource: sourceLookup(t.map),
     label: "TS",
   }));
+}
+
+/**
+ * The room's page as one HTML file to share (exportDocument): a TypeScript script is turned into the same
+ * JavaScript the preview runs, so the file opens in any browser.
+ */
+export async function exportPage(texts: Record<FileId, Y.Text>, meta: Y.Map<unknown>): Promise<string> {
+  const src = sourcesOf(texts, meta);
+  if (meta.get("jsLang") === "ts" && src.js.trim()) src.js = (await tsClient().call("transpile", src.js)).js;
+  return exportDocument(src);
+}
+
+/** Hands `html` to the browser as a download named `fileName` (UTF-8, marked so even opened from disk). */
+export function downloadHtml(html: string, fileName: string) {
+  // the byte-order mark makes a browser read the file as UTF-8 whatever the page declares (or not)
+  const url = URL.createObjectURL(new Blob(["\uFEFF", html], { type: "text/html;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.hidden = true;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 /** Same-browser messages between a room's editor tabs and its preview screens (Run → they run too). */

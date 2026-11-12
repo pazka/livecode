@@ -30,8 +30,18 @@ import { $, announce, h } from "./ui/dom.ts";
 import { Palette, type PaletteItem } from "./ui/palette.ts";
 import { SettingsDialog } from "./ui/settingsDialog.ts";
 import { tsClient } from "./ts/client.ts";
-import { buildPage, isViewer, previewChannel, type PreviewMessage, viewerTarget, viewerUrl } from "./page.ts";
+import {
+  buildPage,
+  downloadHtml,
+  exportPage,
+  isViewer,
+  previewChannel,
+  type PreviewMessage,
+  viewerTarget,
+  viewerUrl,
+} from "./page.ts";
 import { startViewer } from "./viewer.ts";
+import { exportFileName } from "./compose.ts";
 
 const settings = new SettingsStore();
 
@@ -1057,6 +1067,20 @@ function startRoom(roomId: string) {
         },
       );
     },
+    exportPage: () => {
+      const name = exportFileName(roomId);
+      exportPage(texts, meta).then(
+        (html) => {
+          downloadHtml(html, name);
+          popover(`Downloaded ${name}`, false);
+          announce(`The page is downloaded as ${name}`);
+        },
+        (e) => {
+          popover("Download failed", true);
+          announce(`Download failed: ${e instanceof Error ? e.message : String(e)}`);
+        },
+      );
+    },
     newRoom: () => (location.href = "/new"),
     help: () => {
       renderHelp();
@@ -1078,8 +1102,9 @@ function startRoom(roomId: string) {
   }
 
   $("copy-link").addEventListener("click", app.copyLink);
+  $("export-page").addEventListener("click", app.exportPage);
   let popTimer: number | undefined;
-  /** A short note under the copy button (screen readers get the same words through announce). */
+  /** A short note under the room's buttons (screen readers get the same words through announce). */
   function popover(text: string, fail: boolean) {
     const p = $("copy-pop");
     p.textContent = text;
@@ -1311,6 +1336,7 @@ function startRoom(roomId: string) {
     set("palette-btn", "palette", "Show all commands");
     set("settings-btn", "settings", "Settings");
     set("help-btn", "help", "Keyboard help");
+    set("export-page", "exportPage", `Download the page as one file to share: ${exportFileName(roomId)}`);
     const pk = bindings.palette?.[0];
     $("palette-kbd").textContent = pk ? safeKey(pk) : "";
   }

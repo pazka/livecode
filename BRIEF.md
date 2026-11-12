@@ -114,6 +114,16 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
    look like a second caret); an error message at the end of a line sits in a zero-width box, so the caret at
    the line's end (End key) stays right after the text instead of jumping past the message's margin.
 
+21. **Export the page as one file** (owner, 2026-11-12: *"export the code into a single webpage named after the
+   saloon name like "name-of-the-saloon.html" that way I can share it easily"*): the ↓ button next to the room
+   link (or "Download the page as one HTML file" in the palette, bindable in any preset) downloads
+   **`<room>.html`**: the HTML with the CSS in a `<style>` at the start of its head and the script (as a module
+   when "ES module" is on) at the end of its body, put together exactly as the preview does — and nothing of
+   the preview's own (no console capture, no loop guard). A TypeScript room exports the JavaScript the preview
+   runs (types removed). The file is UTF-8 with a byte-order mark, so accents survive when it is opened from
+   disk even without a `<meta charset>`. "Downloaded <room>.html" shows under the button. Nothing is sent to
+   the server: the file is made in the browser.
+
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04; typescript 2026-11-06)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,
 y-codemirror.next, @replit/codemirror-vim, @replit/codemirror-emacs, **typescript 6.0.3** (Microsoft,

@@ -102,7 +102,8 @@ other's preview; Settings → Theme / Keymap / a shortcut change takes effect at
 switch above the code turns `script.js` into `script.ts` for both windows, `document.` then lists the DOM's
 members with their types, and a wrong type (`const n: number = "a"`) is marked on its line. The ↗ button in the
 preview header opens `/r/<room>/view`: the page alone, live, with a Fullscreen button; the other window shows
-an eye (not a person) in its people list.
+an eye (not a person) in its people list. The ↓ button next to the room link downloads `<room>.html`; opened
+from disk it shows the same page as the preview (CSS applied, script running).
 
 ## 4. What runs
 | Item | Value |
