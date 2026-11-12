@@ -73,45 +73,68 @@ export const RUNTIME = `(() => {
 const escapeScript = (s: string) => s.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--");
 const escapeStyle = (s: string) => s.replace(/<\/style/gi, "<\\/style");
 
-export function composeDocument(src: Sources, opts: { guard?: boolean } = {}): string {
+export function composeDocument(
+  src: Sources,
+  opts: { guard?: boolean; runtime?: boolean } = {},
+): string {
   const guard = opts.guard ?? true;
+  const runtime = opts.runtime ?? true;
   let js = src.js;
   if (guard && js.trim()) {
     try {
       js = guardLoops(js);
     } catch { /* unparseable: run as written */ }
   }
-  const headBits = `<script>${RUNTIME}</script>` +
+  const headBits = (runtime ? `<script>${RUNTIME}</script>` : "") +
     (src.css.trim() ? `<style>${escapeStyle(src.css)}</style>` : "");
   const script = js.trim()
-    ? `<script${src.jsModule ? ' type="module"' : ""}>${
-      escapeScript(js)
-    }\n//# sourceURL=${JS_SOURCE_URL}\n</script>`
+    ? `<script${src.jsModule ? ' type="module"' : ""}>${escapeScript(js)}${
+      runtime ? `\n//# sourceURL=${JS_SOURCE_URL}` : ""
+    }\n</script>`
     : "";
 
   let html = src.html;
-  const head = html.match(/<head(\s[^>]*)?>/i);
-  if (head && head.index !== undefined) {
-    const at = head.index + head[0].length;
-    html = html.slice(0, at) + headBits + html.slice(at);
-  } else {
-    const root = html.match(/<html(\s[^>]*)?>/i);
-    if (root && root.index !== undefined) {
-      const at = root.index + root[0].length;
-      html = html.slice(0, at) + `<head>${headBits}</head>` + html.slice(at);
-    } else {
-      // a fragment (maybe after a doctype): the scripts/styles go first and the parser puts them in the
-      // implied <head>, as it would for a file; never before the doctype (that would switch to quirks mode)
-      const doctype = html.match(/^\s*<!doctype[^>]*>/i);
-      const at = doctype ? doctype[0].length : 0;
-      html = html.slice(0, at) + headBits + html.slice(at);
-    }
-  }
+  if (headBits) html = intoHead(html, headBits);
   if (script) {
     const end = html.search(/<\/body\s*>(?![\s\S]*<\/body\s*>)/i);
     html = end >= 0 ? html.slice(0, end) + script + html.slice(end) : html + script;
   }
   return html;
+}
+
+/** `bits` at the start of the document's head (or where the parser makes one), never before a doctype. */
+function intoHead(html: string, bits: string): string {
+  const head = html.match(/<head(\s[^>]*)?>/i);
+  if (head && head.index !== undefined) {
+    const at = head.index + head[0].length;
+    return html.slice(0, at) + bits + html.slice(at);
+  }
+  const root = html.match(/<html(\s[^>]*)?>/i);
+  if (root && root.index !== undefined) {
+    const at = root.index + root[0].length;
+    return html.slice(0, at) + `<head>${bits}</head>` + html.slice(at);
+  }
+  // a fragment (maybe after a doctype): the scripts/styles go first and the parser puts them in the
+  // implied <head>, as it would for a file; never before the doctype (that would switch to quirks mode)
+  const doctype = html.match(/^\s*<!doctype[^>]*>/i);
+  const at = doctype ? doctype[0].length : 0;
+  return html.slice(0, at) + bits + html.slice(at);
+}
+
+/**
+ * The page as one file to share (owner 2026-11-12: "export the code into a single webpage named after the
+ * room"): the three files in one HTML document, put together exactly as the preview does it, but without
+ * anything of the preview's own — no runtime (console capture, heartbeat), no loop guard, no source name.
+ * What opens from the file is what the room's preview shows.
+ */
+export function exportDocument(src: Sources): string {
+  return composeDocument(src, { guard: false, runtime: false });
+}
+
+/** The file name of a room's export: the room's name (a–z, 0–9, dashes) + ".html". */
+export function exportFileName(room: string): string {
+  const name = room.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+  return `${name || "page"}.html`;
 }
 
 /** The user's script inside a composed document: its text and the document line it starts on. */

@@ -63,6 +63,7 @@ const COMMON_APP: Bindings = {
   fontSmaller: [],
   fontReset: [],
   copyLink: [],
+  exportPage: [],
   newRoom: [],
   help: [],
 };

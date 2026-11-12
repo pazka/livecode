@@ -169,6 +169,7 @@ export const APP_COMMANDS: AppCommand[] = [
   app("fontSmaller", "Smaller editor font", "View"),
   app("fontReset", "Default editor font size", "View"),
   app("copyLink", "Copy the room link", "Room"),
+  app("exportPage", "Download the page as one HTML file (<room>.html) to share", "Room"),
   app("newRoom", "Open a new empty room", "Room"),
   app("help", "Keyboard help", "Help"),
 ];
