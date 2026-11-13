@@ -135,6 +135,17 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
    Its own undo step: Undo puts the code back as typed (and it is not formatted again). The "Format file"
    command (Shift+Alt+F …) still formats a whole file on demand.
 
+23. **The whole error message** (owner, 2026-11-14: *"I want to see the error suggested by typescript on hover,
+   currently I don't have any way of seeing the full error"*): the message at the end of an error's line is one
+   line, cut short. Resting the mouse on the underlined code — or on that message — opens a box with the whole
+   message, wrapped and selectable (TypeScript's explanation chain on its own lines); on the message, every
+   error of the line. In a TypeScript room the box sits with the type of the name under the mouse. For every
+   error shown in the code: TypeScript's, the script's runtime errors, the stylesheet's. By keyboard: "Show
+   the full error at the cursor" in the palette (JetBrains Ctrl/Cmd+F1, bindable in any preset), announced to
+   screen readers; Escape closes it. On the first lines of a file the box (and the type's box) opens under
+   the code, never over the file buttons above the editor.
+24. The **Settings** button is a gear (it was a sun-like circle with rays, read as a theme switch).
+
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04; typescript 2026-11-06)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,
 y-codemirror.next, @replit/codemirror-vim, @replit/codemirror-emacs, **typescript 6.0.3** (Microsoft,

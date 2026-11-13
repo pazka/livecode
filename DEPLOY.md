@@ -105,7 +105,8 @@ preview header opens `/r/<room>/view`: the page alone, live, with a Fullscreen b
 an eye (not a person) in its people list. The ↓ button next to the room link downloads `<room>.html`; opened
 from disk it shows the same page as the preview (CSS applied, script running). Typing `b();` on a line of
 `if (a) {` … `}` without indentation: a second later the line is indented (Settings → Editor → "Format my
-code as I type" turns it off).
+code as I type" turns it off). With TypeScript on, `const n: number = "a"`: resting the mouse on the
+underlined `n` (or on the red message at the line's end) opens a box with the whole message.
 
 ## 4. What runs
 | Item | Value |

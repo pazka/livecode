@@ -2,8 +2,15 @@
 // (compose.ts). CodeMirror's state only, no browser.
 
 import { assertEquals } from "@std/assert";
-import { Text } from "@codemirror/state";
-import { cssErrors, place } from "../src/client/diagnostics.ts";
+import { EditorState, Text } from "@codemirror/state";
+import {
+  cssErrors,
+  errorDisplay,
+  errorsAt,
+  errorsEffect,
+  oneLine,
+  place,
+} from "../src/client/diagnostics.ts";
 import { composeDocument, scriptLine } from "../src/client/compose.ts";
 
 const msgs = (css: string) => cssErrors(css).map((e) => `${e.line}: ${e.message}`);
@@ -52,4 +59,42 @@ Deno.test("compose: a line of the page maps back to the script's line", () => {
   assertEquals(scriptLine(broken, 1, "SyntaxError: missing ) after argument list"), 1);
   const fine = composeDocument({ html: "<p>x</p>", css: "", js: "f(1);\nlet b = 1;", jsModule: false });
   assertEquals(scriptLine(fine, 1, "SyntaxError: x"), null, "a script that parses is not blamed");
+});
+
+Deno.test("full error: the whole message at the marked code, every error of the line at its end", () => {
+  const long =
+    "Type '{ a: string; }' is not assignable to type 'P'.\n  Property 'b' is missing in type '{ a: string; }'";
+  let s = EditorState.create({
+    doc: 'let a = 1;\nconst p: P = { a: "x" }; q();\nok();',
+    extensions: errorDisplay,
+  });
+  assertEquals(errorsAt(s, 12), null, "no errors yet");
+  s = s.update({
+    effects: errorsEffect([
+      { line: 2, col: 7, message: long }, // on `p` (11 + 6 = 17..18)
+      { line: 2, col: 26, message: "Cannot find name 'q'." }, // on `q` (36..37)
+    ]),
+  }).state;
+  // on the marked word: that error only, whole (not cut, its lines kept)
+  assertEquals(errorsAt(s, 17), { from: 17, to: 18, messages: [long] });
+  assertEquals(errorsAt(s, 36)?.messages, ["Cannot find name 'q'."]);
+  // elsewhere on the line, and on other lines: nothing
+  assertEquals(errorsAt(s, 25), null);
+  assertEquals(errorsAt(s, 3), null);
+  assertEquals(errorsAt(s, s.doc.line(3).to), null);
+  // at the line's end (the message drawn there): every error of the line
+  assertEquals(errorsAt(s, s.doc.line(2).to)?.messages, [long, "Cannot find name 'q'."]);
+  // marks follow the edits: a line inserted above
+  s = s.update({ changes: { from: 0, insert: "// top\n" } }).state;
+  assertEquals(errorsAt(s, 24)?.messages, [long]);
+});
+
+Deno.test("full error: the message at the line's end is one line, cut short", () => {
+  assertEquals(
+    oneLine("Type A.\n  Property 'b' is missing.\n    Deeper."),
+    "Type A. Property 'b' is missing. Deeper.",
+  );
+  const cut = oneLine("x".repeat(300));
+  assertEquals(cut.length, 141);
+  assertEquals(cut.endsWith("…"), true);
 });

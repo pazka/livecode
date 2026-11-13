@@ -85,6 +85,7 @@ const NO_EDITOR: Bindings = {
   reindent: [],
   startCompletion: [],
   showType: [],
+  showError: [],
   renameSymbol: [],
   selectAll: [],
   selectLine: [],
@@ -178,6 +179,7 @@ export const PRESETS: Preset[] = [
       reindent: ["Mod-Alt-l"],
       startCompletion: ["Ctrl-Space"],
       renameSymbol: ["Shift-F6"],
+      showError: ["Mod-F1"], // JetBrains "Error Description"
       selectAll: ["Mod-a"],
       selectNextOccurrence: ["Alt-j"],
       selectAllOccurrences: ["Mod-Alt-Shift-j"],

@@ -155,6 +155,21 @@ export const editorTheme = EditorView.theme({
     whiteSpace: "pre",
     userSelect: "none",
   },
+  // the whole message of an error (hover on the underlined code or on the message; "Show the full error")
+  ".cm-lc-errorInfo": {
+    maxWidth: "40rem",
+    maxHeight: "16rem",
+    overflowY: "auto",
+    padding: "4px 8px",
+    borderLeft: "3px solid var(--danger)",
+    fontFamily: "var(--ui-font)",
+    lineHeight: "1.45",
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+    userSelect: "text",
+  },
+  ".cm-lc-errorInfo p": { margin: "2px 0" },
+  ".cm-lc-errorInfo p + p": { marginTop: "6px", paddingTop: "6px", borderTop: "1px solid var(--border)" },
   // TypeScript (ts/client.ts): a type and its documentation, in the hover box and the completion's side box
   ".cm-lc-typeInfo": { maxWidth: "36rem", padding: "4px 8px", fontFamily: "var(--ui-font)" },
   ".cm-lc-typeInfo code": {

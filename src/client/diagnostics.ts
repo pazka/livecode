@@ -7,9 +7,21 @@
 //   (a missing `;` or `:`, a `{` never closed, one `}` too many).
 // Drawn with CodeMirror decorations only: a wavy underline, a bar on the line and the message at the end of the
 // line. Marks follow the edits made after they were placed. Pure parts tested in tests/diagnostics_test.ts.
+// The message at the line's end is one line, cut short: the whole message (owner 2026-11-14: "see the error
+// suggested by typescript on hover, currently I don't have any way of seeing the full error") is in a box when
+// the mouse rests on the underlined code or on that message, and by keyboard with "Show the full error at the
+// cursor" (showErrorAtCursor) — wrapped, selectable, every error of the spot.
 
 import { type EditorState, type Extension, StateEffect, StateField, type Text } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  hoverTooltip,
+  showTooltip,
+  type Tooltip,
+  WidgetType,
+} from "@codemirror/view";
 import { cssLanguage } from "@codemirror/lang-css";
 
 export interface CodeError {
@@ -63,17 +75,22 @@ class MessageWidget extends WidgetType {
     box.className = "cm-lc-errorMsgBox";
     const s = document.createElement("span");
     s.className = "cm-lc-errorMsg";
-    s.title = this.text;
     const sr = document.createElement("span");
     sr.className = "sr-only";
     sr.textContent = "Error: ";
-    s.append(sr, this.text.length > 140 ? this.text.slice(0, 140) + "…" : this.text);
+    s.append(sr, oneLine(this.text));
     box.append(s);
     return box;
   }
   override ignoreEvent() {
     return false;
   }
+}
+
+/** A message on one line, cut short (the whole of it is in the hover box). */
+export function oneLine(message: string, max = 140): string {
+  const flat = message.replace(/\s*\n\s*/g, " ").trim();
+  return flat.length > max ? flat.slice(0, max) + "…" : flat;
 }
 
 const underline = Decoration.mark({ class: "cm-lc-error" });
@@ -128,8 +145,112 @@ const errorsField = StateField.define<ErrorsValue>({
   provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
 });
 
-/** The editor extension that draws the errors. */
-export const errorDisplay: Extension = errorsField;
+/**
+ * The errors to tell about at `pos`: the ones marked there; at the end of a line (where its message is
+ * drawn), every error of that line.
+ */
+export function errorsAt(
+  state: EditorState,
+  pos: number,
+): { from: number; to: number; messages: string[] } | null {
+  const list = state.field(errorsField, false)?.list ?? [];
+  if (!list.length) return null;
+  const line = state.doc.lineAt(pos);
+  const onLine = list.filter((p) => p.from >= line.from && p.from <= line.to);
+  const hit = pos === line.to ? onLine : onLine.filter((p) => p.from <= pos && pos <= p.to);
+  if (!hit.length) return null;
+  return {
+    from: Math.min(...hit.map((p) => p.from)),
+    to: Math.max(...hit.map((p) => p.to)),
+    messages: [...new Set(hit.map((p) => p.message))],
+  };
+}
+
+/** The box with the whole message(s): wrapped, selectable. */
+function errorBox(messages: readonly string[]): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "cm-lc-errorInfo";
+  for (const m of messages) {
+    const p = document.createElement("p");
+    const sr = document.createElement("span");
+    sr.className = "sr-only";
+    sr.textContent = "Error: ";
+    p.append(sr, m);
+    box.append(p);
+  }
+  return box;
+}
+
+/**
+ * True when a hover box fits above `pos` inside the editor itself. On the first lines it does not: it would
+ * cover the file buttons above the code (and stay there while the mouse crosses it) — it goes below instead.
+ */
+export function roomAbove(view: EditorView, pos: number, need = 110): boolean {
+  const at = view.coordsAtPos(pos);
+  return !!at && at.top - view.scrollDOM.getBoundingClientRect().top >= need;
+}
+
+/** Mouse resting on the underlined code or on the message at the line's end: the whole message. */
+const errorHover = hoverTooltip((view, pos) => {
+  const e = errorsAt(view.state, pos);
+  if (!e) return null;
+  // on the message itself (the line's end): the box at the line's end, under it
+  const atEnd = pos === view.state.doc.lineAt(pos).to;
+  return {
+    pos: atEnd ? pos : e.from,
+    end: atEnd ? pos : e.to,
+    above: !atEnd && roomAbove(view, e.from),
+    create: () => ({ dom: errorBox(e.messages) }),
+  };
+}, { hoverTime: 350 });
+
+const setErrorTip = StateEffect.define<Tooltip | null>();
+
+/** The box of "Show the full error at the cursor"; closed by any edit, caret move or Escape. */
+const errorTipField = StateField.define<Tooltip | null>({
+  create: () => null,
+  update(v, tr) {
+    for (const e of tr.effects) if (e.is(setErrorTip)) return e.value;
+    return tr.docChanged || tr.selection ? null : v;
+  },
+  provide: (f) => showTooltip.from(f),
+});
+
+/**
+ * Keyboard: the whole message of the error(s) at the caret — the ones marked under it, else every error of
+ * its line — in a box under the caret, and told to screen readers through `announce`.
+ */
+export function showErrorAtCursor(view: EditorView, announce: (msg: string) => void = () => {}): boolean {
+  if (view.state.field(errorTipField, false) === undefined) return false;
+  const pos = view.state.selection.main.head;
+  const e = errorsAt(view.state, pos) ?? errorsAt(view.state, view.state.doc.lineAt(pos).to);
+  if (!e) {
+    announce("No error on this line");
+    return true;
+  }
+  announce(`${e.messages.length === 1 ? "Error" : "Errors"}: ${e.messages.join(" — ")}`);
+  view.dispatch({
+    effects: setErrorTip.of({ pos, above: false, create: () => ({ dom: errorBox(e.messages) }) }),
+  });
+  return true;
+}
+
+/** The editor extension that draws the errors and shows their whole message (hover, keyboard). */
+export const errorDisplay: Extension = [
+  errorsField,
+  errorHover,
+  errorTipField,
+  EditorView.domEventHandlers({
+    keydown: (e, view) => {
+      if (e.key !== "Escape" || !view.state.field(errorTipField)) return false;
+      view.dispatch({ effects: setErrorTip.of(null) });
+      return true;
+    },
+  }),
+];
+
+/** The effect that replaces the errors shown (for a transaction built by hand; showErrors does it on a view). */
+export const errorsEffect = (errors: CodeError[]) => setErrors.of(errors);
 
 /** Replace the errors shown in an editor ([] clears them). */
 export function showErrors(view: EditorView, errors: CodeError[]) {
