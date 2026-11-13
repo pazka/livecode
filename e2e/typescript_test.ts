@@ -227,6 +227,80 @@ Deno.test({
         );
       });
 
+      await check(
+        "errors: the whole message on hover (underlined code, message at the line's end) and by keyboard",
+        async () => {
+          // two errors on one short line: its end shows them on one line, cut short
+          const code = "interface P { x: number; y: boolean }\n" + 'const p: P = { x: "a", y: "b" };\n';
+          await script(a, code);
+          await a.click("#run-btn");
+          await a.waitForSelector("#panel-js .cm-lc-error", { timeout: 10_000 });
+          const info =
+            `[...document.querySelectorAll(".cm-lc-errorInfo")].map((b) => b.textContent).join("|")`;
+          const centre = (sel: string) =>
+            a.evaluate((sel) => {
+              const b = document.querySelector(sel)!.getBoundingClientRect();
+              return { x: b.left + Math.min(b.width / 2, 40), y: b.top + b.height / 2 };
+            }, sel);
+          // 1. the underlined code
+          let at = await centre("#panel-js .cm-lc-error");
+          await a.mouse.move(at.x - 30, at.y - 30);
+          await a.mouse.move(at.x, at.y);
+          await expectTrue(
+            a,
+            `${info}.includes("is not assignable to type 'number'")`,
+            "box on the code",
+            8000,
+          );
+          // on the first lines the box opens under the code: never over the file buttons above the editor
+          const clear = await a.evaluate(() =>
+            document.querySelector(".cm-lc-errorInfo")!.getBoundingClientRect().top >=
+              document.getElementById("panel-js")!.getBoundingClientRect().top
+          );
+          if (!clear) throw new Error("the box covers the file buttons");
+          await shot(a, "ts-04-error-hover");
+          await a.mouse.move(5, 5);
+          await expectTrue(a, `!document.querySelector(".cm-lc-errorInfo")`, "goes away", 5000);
+          // 2. the message at the line's end: every error of the line, whole
+          at = await centre("#panel-js .cm-lc-errorMsg");
+          await a.mouse.move(at.x, at.y - 3);
+          await a.mouse.move(at.x, at.y);
+          await expectTrue(
+            a,
+            `${info}.includes("is not assignable to type 'number'") && ${info}.includes("is not assignable to type 'boolean'")`,
+            "box on the message, all the line's errors",
+            8000,
+          );
+          const whole = await a.evaluate(() => {
+            const box = document.querySelector(".cm-lc-errorInfo")!;
+            const r = box.getBoundingClientRect();
+            return {
+              cut: box.textContent!.includes("…"),
+              inView: r.left >= 0 && r.right <= innerWidth && r.width > 50,
+            };
+          });
+          if (whole.cut || !whole.inView) throw new Error(JSON.stringify(whole));
+          await shot(a, "ts-05-error-hover-message");
+          await a.mouse.move(5, 5);
+          await expectTrue(a, `!document.querySelector(".cm-lc-errorInfo")`, "goes away", 5000);
+          // 3. keyboard: the palette's command, Escape closes
+          await a.click("#panel-js .cm-content");
+          await a.keyboard.press("Control+End");
+          await a.keyboard.press("ArrowUp");
+          await a.keyboard.press("F1");
+          await a.keyboard.type("Show the full error");
+          await a.keyboard.press("Enter");
+          await expectTrue(a, `${info}.includes("is not assignable to type")`, "box by keyboard", 5000);
+          await expectTrue(
+            a,
+            `document.getElementById("live").textContent.includes("not assignable")`,
+            "announced",
+          );
+          await a.keyboard.press("Escape");
+          await expectTrue(a, `!document.querySelector(".cm-lc-errorInfo")`, "closed by Escape");
+        },
+      );
+
       await check("preview: the TypeScript runs (types removed) for both people", async () => {
         await setText(a, "html", '<p id="out">…</p>');
         await script(

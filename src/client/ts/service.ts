@@ -256,7 +256,7 @@ export class ScriptService {
       if (d.category !== this.ts.DiagnosticCategory.Error || IGNORED_CODES.has(d.code)) continue;
       const at = d.start ?? 0;
       const lc = lineCol(text, at);
-      out.push({ ...lc, code: d.code, message: this.ts.flattenDiagnosticMessageText(d.messageText, " ") });
+      out.push({ ...lc, code: d.code, message: this.ts.flattenDiagnosticMessageText(d.messageText, "\n") });
     }
     return out.sort((a, b) => a.line - b.line || a.col - b.col);
   }

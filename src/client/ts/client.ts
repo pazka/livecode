@@ -14,6 +14,7 @@ import {
 import { LanguageSupport, syntaxTree } from "@codemirror/language";
 import { type Extension, StateEffect, StateField } from "@codemirror/state";
 import { EditorView, hoverTooltip, showTooltip, type Tooltip } from "@codemirror/view";
+import { roomAbove } from "../diagnostics.ts";
 import { typescriptLanguage, typescriptSnippets } from "@codemirror/lang-javascript";
 import type { TsApi, TsMethod, TsRequest, TsResponse } from "./protocol.ts";
 import type { CompletionEntry } from "./service.ts";
@@ -226,7 +227,7 @@ function typeHover(c: TsClient): Extension {
     return {
       pos: t.from,
       end: t.to,
-      above: true,
+      above: roomAbove(view, t.from),
       create: () => ({ dom: typeBox(t.display, t.docs) }),
     };
   }, { hoverTime: 350 });

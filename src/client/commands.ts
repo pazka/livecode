@@ -38,6 +38,7 @@ import { startCompletion } from "@codemirror/autocomplete";
 import type { Command as CMCommand } from "@codemirror/view";
 import { showTypeAtCursor } from "./ts/client.ts";
 import { renameSymbol } from "./rename.ts";
+import { showErrorAtCursor } from "./diagnostics.ts";
 import { announce } from "./ui/dom.ts";
 
 /**
@@ -108,6 +109,12 @@ export const EDITOR_COMMANDS: EditorCommand[] = [
     "Show the type at the cursor (TypeScript)",
     "Edit",
     (view) => showTypeAtCursor(view, announce),
+  ),
+  ed(
+    "showError",
+    "Show the full error at the cursor (the whole message)",
+    "Edit",
+    (view) => showErrorAtCursor(view, announce),
   ),
   ed("renameSymbol", "Rename (every use of the name)", "Edit", (view) => renameSymbol(view, announce)),
   ed("selectAll", "Select all", "Selection", selectAll),
