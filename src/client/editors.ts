@@ -59,6 +59,7 @@ import { editorTheme, highlightStyle } from "./themes.ts";
 import { tsClient, tsCompletionSource, typescriptEditor, typescriptSupport } from "./ts/client.ts";
 import { renameExtension } from "./rename.ts";
 import { type MouseMods, mouseMods } from "./keys.ts";
+import { autoFormat } from "./autoformat.ts";
 
 /** The script's language, shared by the room (meta "jsLang"). */
 export type ScriptLang = "js" | "ts";
@@ -204,6 +205,8 @@ export interface EditorOptions {
   keymap: PresetId;
   tabSize: number;
   lineWrap: boolean;
+  /** The person's own lines formatted as they go (autoformat.ts). */
+  autoFormat: boolean;
 }
 
 export interface FileOptions {
@@ -217,6 +220,7 @@ export class SharedEditor {
   private readonly tabs = new Compartment();
   private readonly wrap = new Compartment();
   private readonly lang = new Compartment();
+  private readonly format = new Compartment();
   private scriptLang: ScriptLang;
 
   constructor(
@@ -258,6 +262,7 @@ export class SharedEditor {
         this.lang.of(languageExtension(file, this.scriptLang, texts)),
         this.tabs.of(tabExtension(opts.tabSize)),
         this.wrap.of(opts.lineWrap ? EditorView.lineWrapping : []),
+        this.format.of(autoFormat(opts.autoFormat)),
         yCollab(ytext, awareness, { undoManager: false }),
         crowdedNames,
         errorDisplay,
@@ -281,6 +286,7 @@ export class SharedEditor {
         this.modal.reconfigure(modalExtension(opts.keymap)),
         this.tabs.reconfigure(tabExtension(opts.tabSize)),
         this.wrap.reconfigure(opts.lineWrap ? EditorView.lineWrapping : []),
+        this.format.reconfigure(autoFormat(opts.autoFormat)),
       ],
     });
   }

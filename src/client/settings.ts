@@ -33,6 +33,8 @@ export interface Settings {
   keepConsole: boolean;
   /** Errors of the JS and CSS drawn in the editors, refreshed with the preview (on by default). */
   showErrors: boolean;
+  /** The person's own lines re-indented and trimmed a moment after they stop typing (on by default). */
+  autoFormat: boolean;
   /** Files shown in the code area, in order (1 to 3, no repeats). */
   panes: FileId[];
   /** Relative size of each file's pane (flex weight) when several are shown. */
@@ -96,6 +98,7 @@ export function defaults(): Settings {
     previewPage: true,
     keepConsole: false,
     showErrors: true,
+    autoFormat: true,
     panes: ["html"],
     paneSizes: { html: 1, css: 1, js: 1 },
     paneDir: "auto",
@@ -139,6 +142,7 @@ export function sanitize(raw: unknown, base: Settings = defaults()): Settings {
     previewPage: typeof r.previewPage === "boolean" ? r.previewPage : base.previewPage,
     keepConsole: typeof r.keepConsole === "boolean" ? r.keepConsole : base.keepConsole,
     showErrors: typeof r.showErrors === "boolean" ? r.showErrors : base.showErrors,
+    autoFormat: typeof r.autoFormat === "boolean" ? r.autoFormat : base.autoFormat,
     panes: sanitizePanes(r.panes, base.panes),
     paneSizes: Object.fromEntries(FILES.map((f) => {
       const sizes = (r.paneSizes && typeof r.paneSizes === "object" ? r.paneSizes : {}) as Record<

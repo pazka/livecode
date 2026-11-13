@@ -165,6 +165,7 @@ export const APP_COMMANDS: AppCommand[] = [
   app("cycleTheme", "Next theme", "View"),
   app("toggleLayout", "Side by side / stacked layout", "View"),
   app("toggleWrap", "Toggle line wrapping", "View"),
+  app("toggleAutoFormat", "Format my code as I type (on / off)", "Edit"),
   app("fontBigger", "Bigger editor font", "View"),
   app("fontSmaller", "Smaller editor font", "View"),
   app("fontReset", "Default editor font size", "View"),
