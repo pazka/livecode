@@ -4,6 +4,7 @@ import { assert, assertEquals, assertFalse } from "@std/assert";
 import { clientIp, inCidr, originAllowed } from "../src/server/net.ts";
 import { ENV_VARS, LIBRARY_ENV_VARS, loadConfig } from "../src/server/config.ts";
 import { isRoomId, newRoomId } from "../src/shared/protocol.ts";
+import { repairInteropHelper } from "../scripts/bundlefix.ts";
 import { defaults, sanitize } from "../src/client/settings.ts";
 import { fuzzyScore } from "../src/client/ui/palette.ts";
 
@@ -111,4 +112,18 @@ Deno.test("palette: fuzzy matching ranks word starts and runs", () => {
   const b = fuzzyScore("theme dark", "Theme: Solarized dark")!;
   assert(a > b, `${a} > ${b}`);
   assert(fuzzyScore("hcd", "Theme: High contrast dark") !== null);
+});
+
+Deno.test("build: a bundle's CommonJS helper broken by the minifier is repaired (bundlefix.ts)", () => {
+  const tail = '$6e(vs,"default",{value:ll,enumerable:!0}):vs,ll));';
+  const good = "var jft=(ll,$o,vs)=>(vs=ll!=null?Fft(Gft(ll)):{},Vft(1 ?" + tail;
+  // the first parameter named `$o`: the rewrite of `$o||!ll||!ll.__esModule` to `1` left its `$` behind
+  const broken = good.replace("Vft(1 ?", "Vft($1 ?");
+  assertEquals(repairInteropHelper(broken), { js: good, repaired: 1 });
+  assertEquals(repairInteropHelper(good), { js: good, repaired: 0 });
+  // a longer left-over (`a$b` → `a$1`), after a comma
+  assertEquals(repairInteropHelper('x(y,a$1 ?d(t,"default",{value:m').js, 'x(y,1 ?d(t,"default",{value:m');
+  // real `$1` names elsewhere are not touched
+  const other = "function $1(b){return b}var q=c($1 ?a:b);$1(2)";
+  assertEquals(repairInteropHelper(other), { js: other, repaired: 0 });
 });

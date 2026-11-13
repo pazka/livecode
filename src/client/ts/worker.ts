@@ -1,4 +1,5 @@
-// The TypeScript worker (served as /ts-worker.js, loaded only by rooms whose script is TypeScript): the
+// The TypeScript worker (served as /ts-worker.js; started by a room whose script is TypeScript, and in a
+// JavaScript room by the first format or rename of the script): the
 // TypeScript compiler + the browser's type definitions, off the editor's thread. Requests: protocol.ts.
 
 import ts from "typescript";
@@ -19,6 +20,7 @@ const api: TsApi = {
   errors: (text) => service.errors(text),
   transpile: (text) => service.transpile(text),
   rename: (text, pos, lang) => service.rename(text, pos, lang),
+  format: (text, lang, indent) => service.format(text, lang, indent),
 };
 
 scope.onmessage = (e) => {

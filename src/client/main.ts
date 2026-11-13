@@ -42,6 +42,7 @@ import {
 } from "./page.ts";
 import { startViewer } from "./viewer.ts";
 import { exportFileName } from "./compose.ts";
+import { formatFile } from "./autoformat.ts";
 
 const settings = new SettingsStore();
 
@@ -191,8 +192,23 @@ function startRoom(roomId: string) {
         if (file === current) $("sb-pos").textContent = `Ln ${line}, Col ${col}`;
       },
       (g) => texts[g].toString(),
+      { othersCarets: () => othersCarets(f) },
     ),
   ])) as Record<FileId, SharedEditor>;
+
+  /** Where the other people's carets (and selection ends) are in a file: formatting leaves those lines. */
+  function othersCarets(f: FileId): number[] {
+    const out: number[] = [];
+    for (const [id, st] of awareness.getStates()) {
+      if (id === doc.clientID || isViewer(st)) continue;
+      for (const end of [st.cursor?.anchor, st.cursor?.head]) {
+        if (!end) continue;
+        const abs = Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(end), doc);
+        if (abs && abs.type === texts[f]) out.push(abs.index);
+      }
+    }
+    return out;
+  }
 
   let limitNoticeAt = 0;
   function onFileLimit(f: FileId) {
@@ -687,7 +703,18 @@ function startRoom(roomId: string) {
     open(viewerUrl(roomId), viewerTarget(roomId), "noopener");
   }
 
-  $("run-btn").addEventListener("click", runPreview);
+  /**
+   * Run as the person asks for it (Ctrl/Cmd+S, Ctrl/Cmd+Enter, the Run button, vim's :w): with "Format my
+   * code" on, the files they have on screen are formatted first (autoformat.ts), then the page runs. The
+   * formatter gets a moment (the TypeScript worker may still be starting); the page never waits longer.
+   */
+  function saveAndRun() {
+    if (!settings.get().autoFormat) return runPreview();
+    const jobs = settings.get().panes.map((f) => formatFile(editors[f].view));
+    Promise.race([Promise.allSettled(jobs), new Promise((r) => setTimeout(r, 700))]).then(runPreview);
+  }
+
+  $("run-btn").addEventListener("click", saveAndRun);
   $<HTMLInputElement>("auto-run").addEventListener("change", (e) => {
     const on = (e.target as HTMLInputElement).checked;
     previewPaused = false;
@@ -977,7 +1004,7 @@ function startRoom(roomId: string) {
     ].filter((x): x is HTMLElement => x !== null && x.getClientRects().length > 0);
 
   const app: Record<string, () => void> = {
-    run: runPreview,
+    run: saveAndRun,
     toggleAutoRun: () => {
       previewPaused = false;
       settings.update({ autoRun: !settings.get().autoRun });
@@ -1054,7 +1081,7 @@ function startRoom(roomId: string) {
     toggleWrap: () => settings.update({ lineWrap: !settings.get().lineWrap }),
     toggleAutoFormat: () => {
       settings.update({ autoFormat: !settings.get().autoFormat });
-      announce(`Format as you type ${settings.get().autoFormat ? "on" : "off"}`);
+      announce(`Format my code ${settings.get().autoFormat ? "on" : "off"}`);
     },
     fontBigger: () => settings.update({ fontSize: settings.get().fontSize + 1 }),
     fontSmaller: () => settings.update({ fontSize: settings.get().fontSize - 1 }),
@@ -1190,7 +1217,7 @@ function startRoom(roomId: string) {
   }, true);
 
   // --- vim: ex commands + user mappings ---
-  Vim.defineEx("write", "w", () => runPreview());
+  Vim.defineEx("write", "w", () => saveAndRun());
   Vim.defineEx("edit", "e", (_cm: unknown, params: { args?: string[] }) => {
     const a = (params.args?.[0] ?? "").toLowerCase();
     const f = a.startsWith("c") ? "css" : a.startsWith("j") ? "js" : a.startsWith("h") ? "html" : null;

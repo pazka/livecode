@@ -241,3 +241,39 @@ Deno.test("typescript: rename works in a JavaScript room too", () => {
   // and the TypeScript file is untouched by it (completions still from the TS text)
   assert(service.completions("document.", 9, ".")!.entries.some((e) => e.name === "body"));
 });
+
+/** `text` with the service's formatting applied. */
+function formatted(text: string, lang: "ts" | "js", indent = 2): string {
+  let out = text;
+  for (const e of service.format(text, lang, indent).reverse()) {
+    out = out.slice(0, e.from) + e.insert + out.slice(e.to);
+  }
+  return out;
+}
+
+Deno.test("typescript: format — spaces around operators, after commas and colons, inside braces; indentation", () => {
+  const src =
+    "interface P {\nx:number;\n      y?:string\n}\nfunction f(a:P,b=1){\nif(a.x>1){return a.x+b}\n" +
+    "for(let i=0;i<3;i++){console.log( i ,[1,2,3],{a:1,b:2})}\n      return {a,b}   \n}\n";
+  assertEquals(
+    formatted(src, "ts"),
+    "interface P {\n  x: number;\n  y?: string\n}\nfunction f(a: P, b = 1) {\n  if (a.x > 1) { return a.x + b }\n" +
+      "  for (let i = 0; i < 3; i++) { console.log(i, [1, 2, 3], { a: 1, b: 2 }) }\n  return { a, b }\n}\n",
+  );
+  // already formatted: nothing to change
+  assertEquals(service.format(formatted(src, "ts"), "ts"), []);
+  // the indent width is the person's
+  assertStringIncludes(formatted("if(a){\nb()\n}", "ts", 4), "\n    b()\n");
+});
+
+Deno.test("typescript: format — JavaScript too; quotes, semicolons and template strings stay as written", () => {
+  assertEquals(
+    formatted(
+      "const s=`  a   ${ x }  b`\nlet t='q';let u=\"r\"\ndocument.addEventListener('click',()=>{\nf(1,2)\n})\n",
+      "js",
+    ),
+    "const s = `  a   ${x}  b`\nlet t = 'q'; let u = \"r\"\ndocument.addEventListener('click', () => {\n  f(1, 2)\n})\n",
+  );
+  // half-typed code is still formatted where it can be, never thrown on
+  assertStringIncludes(formatted("function f(a,b){\nreturn (a+\n", "js"), "function f(a, b) {");
+});

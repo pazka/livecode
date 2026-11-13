@@ -39,6 +39,7 @@ import type { Command as CMCommand } from "@codemirror/view";
 import { showTypeAtCursor } from "./ts/client.ts";
 import { renameSymbol } from "./rename.ts";
 import { showErrorAtCursor } from "./diagnostics.ts";
+import { canFormatFile, formatFile } from "./autoformat.ts";
 import { announce } from "./ui/dom.ts";
 
 /**
@@ -50,6 +51,11 @@ export const formatCode: CMCommand = (view) => {
   const { state } = view;
   if (state.readOnly) return false;
   if (state.selection.ranges.some((r) => !r.empty)) return indentSelection(view);
+  if (canFormatFile(state)) {
+    // an editor of the app: the file's own formatting (autoformat.ts — the script by TypeScript's formatter)
+    formatFile(view);
+    return true;
+  }
   const doc = state.doc;
   const indent = indentRange(state, 0, doc.length);
   const trims: { from: number; to: number }[] = [];
@@ -172,7 +178,7 @@ export const APP_COMMANDS: AppCommand[] = [
   app("cycleTheme", "Next theme", "View"),
   app("toggleLayout", "Side by side / stacked layout", "View"),
   app("toggleWrap", "Toggle line wrapping", "View"),
-  app("toggleAutoFormat", "Format my code as I type (on / off)", "Edit"),
+  app("toggleAutoFormat", "Format my code as I type and on Run / save (on / off)", "Edit"),
   app("fontBigger", "Bigger editor font", "View"),
   app("fontSmaller", "Smaller editor font", "View"),
   app("fontReset", "Default editor font size", "View"),

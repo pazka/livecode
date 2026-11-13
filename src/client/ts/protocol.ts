@@ -1,7 +1,7 @@
 // Messages between the editor and the TypeScript worker (worker.ts). Each request carries an id; the
 // worker answers with the same id and either `result` or `error`.
 
-import type { Completions, RenameResult, Transpiled, TypeError, TypeInfo } from "./service.ts";
+import type { Completions, RenameResult, TextEdit, Transpiled, TypeError, TypeInfo } from "./service.ts";
 
 export interface TsApi {
   completions(text: string, pos: number, trigger?: string): Completions | null;
@@ -10,6 +10,7 @@ export interface TsApi {
   errors(text: string): TypeError[];
   transpile(text: string): Transpiled;
   rename(text: string, pos: number, lang?: "ts" | "js"): RenameResult;
+  format(text: string, lang?: "ts" | "js", indent?: number): TextEdit[];
 }
 
 export type TsMethod = keyof TsApi;

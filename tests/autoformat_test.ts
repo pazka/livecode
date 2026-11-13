@@ -8,7 +8,14 @@ import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
 import { javascript } from "@codemirror/lang-javascript";
 import { ySyncAnnotation } from "y-codemirror.next";
-import { autoFormat, formatChanges, isOwnEdit, pendingLines } from "../src/client/autoformat.ts";
+import {
+  autoFormat,
+  cssSpacing,
+  formatChanges,
+  isOwnEdit,
+  pendingLines,
+  planFormat,
+} from "../src/client/autoformat.ts";
 
 const make = (doc: string, lang: Extension, cursor = doc.length) =>
   EditorState.create({
@@ -103,4 +110,67 @@ Deno.test("autoformat: undo, redo and the format itself are not edits to format 
     assertEquals(isOwnEdit(s.update({ changes: { from: 0, insert: "a" }, userEvent: ev })), true, ev);
   }
   assertEquals(isOwnEdit(s.update({ selection: EditorSelection.cursor(0), userEvent: "input" })), false);
+});
+
+/** The stylesheet with its spaces put right (every line, no caret in the way). */
+function spaced(doc: string): string {
+  const s = EditorState.create({
+    doc,
+    extensions: [css(), indentUnit.of("  "), autoFormat(true, { css: true })],
+  });
+  const lines = new Set(Array.from({ length: s.doc.lines }, (_, i) => i + 1));
+  return s.update({ changes: planFormat(s, lines, new Set(), null) }).state.doc.toString();
+}
+
+Deno.test("format: a stylesheet gets its spaces (before {, after : and ;, inside a one-line block)", () => {
+  assertEquals(spaced("a{color:red;background:blue}"), "a { color: red; background: blue }");
+  assertEquals(
+    spaced(".x   {\ncolor :   red;\n  margin:0 auto\n}\n"),
+    ".x {\n  color: red;\n  margin: 0 auto\n}\n",
+  );
+  assertEquals(
+    spaced("@media (min-width:40rem){\n.a,.b{top:0}\n}"),
+    "@media (min-width:40rem) {\n  .a,.b { top: 0 }\n}",
+  );
+  // already right, an empty block, a url with a colon, a pseudo-class: untouched
+  const fine = "a:hover { background: url(http://x/y.png); }\nb {}\n:root { --gap: 4px; }\n";
+  assertEquals(spaced(fine), fine);
+  // never across a line: `{` on its own line stays there
+  assertEquals(spaced("a\n{\n  color: red;\n}"), "a\n{\n  color: red;\n}");
+  // spaces only between two things of one line: nothing at a line's start or end
+  const s = EditorState.create({ doc: "  a{b:c}  ", extensions: css() });
+  for (const c of cssSpacing(s)) assertEquals(c.from > 2 && c.to < 8, true, JSON.stringify(c));
+});
+
+Deno.test("format: the real formatter's changes on the person's lines, the caret's line only indented", () => {
+  // what TypeScript's formatter would change in the whole text (hand-written here)
+  const doc = "if(a){\nb=1\nc=2\n}";
+  const s = make(doc, javascript(), 9); // caret on line 2
+  const edits = [
+    { from: 2, to: 2, insert: " " }, // if (a)
+    { from: 5, to: 5, insert: " " }, // ) {
+    { from: 7, to: 7, insert: "  " }, // indent line 2
+    { from: 8, to: 8, insert: " " }, // b =
+    { from: 9, to: 9, insert: " " }, // = 1
+    { from: 11, to: 11, insert: "  " }, // indent line 3
+    { from: 12, to: 12, insert: " " }, // c =
+    { from: 13, to: 13, insert: " " }, // = 2
+  ];
+  const all = new Set([1, 2, 3, 4]);
+  const apply = (lines: Set<number>, light: Set<number>) =>
+    s.update({ changes: planFormat(s, lines, light, edits) }).state.doc.toString();
+  // the whole file (Run / Ctrl+S): everything
+  assertEquals(apply(all, new Set()), "if (a) {\n  b = 1\n  c = 2\n}");
+  // as typed: only my lines (2 and 3); the caret's line (2) gets its indentation, not its spacing yet
+  assertEquals(apply(new Set([2, 3]), new Set([2])), "if(a){\n  b=1\n  c = 2\n}");
+  // a line left out (someone else's caret on line 3) is not touched at all
+  assertEquals(apply(new Set([1, 2, 4]), new Set()), "if (a) {\n  b = 1\nc=2\n}");
+});
+
+Deno.test("format: undo and redo forget what was pending (never formatted behind the person's back)", () => {
+  let s = make("if (a) {\nb();\n}", javascript(), 0);
+  s = own(s, { changes: { from: 9, insert: "x" } });
+  assertEquals(s.field(pendingLines).length, 1);
+  s = s.update({ changes: { from: 9, to: 10 }, userEvent: "undo" }).state;
+  assertEquals(s.field(pendingLines), []);
 });
