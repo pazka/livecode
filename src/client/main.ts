@@ -207,7 +207,7 @@ function startRoom(roomId: string) {
   }
 
   function editorOptions(s: Settings) {
-    return { keymap: s.keymap, tabSize: s.tabSize, lineWrap: s.lineWrap };
+    return { keymap: s.keymap, tabSize: s.tabSize, lineWrap: s.lineWrap, autoFormat: s.autoFormat };
   }
 
   // --- files: the buttons above the code, and one, two or three panes (panes.ts) ---
@@ -1052,6 +1052,10 @@ function startRoom(roomId: string) {
     },
     toggleLayout: () => settings.update({ layout: settings.get().layout === "columns" ? "rows" : "columns" }),
     toggleWrap: () => settings.update({ lineWrap: !settings.get().lineWrap }),
+    toggleAutoFormat: () => {
+      settings.update({ autoFormat: !settings.get().autoFormat });
+      announce(`Format as you type ${settings.get().autoFormat ? "on" : "off"}`);
+    },
     fontBigger: () => settings.update({ fontSize: settings.get().fontSize + 1 }),
     fontSmaller: () => settings.update({ fontSize: settings.get().fontSize - 1 }),
     fontReset: () => settings.update({ fontSize: 14 }),
@@ -1358,7 +1362,10 @@ function startRoom(roomId: string) {
     matcher = makeMatcher(bindings);
     labelButtons();
     renderStatusBar(s);
-    if (!prev || prev.keymap !== s.keymap || prev.tabSize !== s.tabSize || prev.lineWrap !== s.lineWrap) {
+    if (
+      !prev || prev.keymap !== s.keymap || prev.tabSize !== s.tabSize || prev.lineWrap !== s.lineWrap ||
+      prev.autoFormat !== s.autoFormat
+    ) {
       for (const f of FILES) editors[f].configure(editorOptions(s));
     }
     if (!prev || prev.name !== s.name || prev.color !== s.color) setUser(s);

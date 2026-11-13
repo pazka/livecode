@@ -103,7 +103,9 @@ switch above the code turns `script.js` into `script.ts` for both windows, `docu
 members with their types, and a wrong type (`const n: number = "a"`) is marked on its line. The ↗ button in the
 preview header opens `/r/<room>/view`: the page alone, live, with a Fullscreen button; the other window shows
 an eye (not a person) in its people list. The ↓ button next to the room link downloads `<room>.html`; opened
-from disk it shows the same page as the preview (CSS applied, script running).
+from disk it shows the same page as the preview (CSS applied, script running). Typing `b();` on a line of
+`if (a) {` … `}` without indentation: a second later the line is indented (Settings → Editor → "Format my
+code as I type" turns it off).
 
 ## 4. What runs
 | Item | Value |

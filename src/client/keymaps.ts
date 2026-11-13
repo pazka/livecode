@@ -59,6 +59,7 @@ const COMMON_APP: Bindings = {
   cycleTheme: [],
   toggleLayout: [],
   toggleWrap: [],
+  toggleAutoFormat: [],
   fontBigger: [],
   fontSmaller: [],
   fontReset: [],

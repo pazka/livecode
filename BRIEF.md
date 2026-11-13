@@ -124,6 +124,17 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
    disk even without a `<meta charset>`. "Downloaded <room>.html" shows under the button. Nothing is sent to
    the server: the file is made in the browser.
 
+22. **Format as you type** (owner, 2026-11-13: *"add opt out autoformat, on by default, on all files"*): a second
+   after a person stops typing — at once after a paste or a drop — the lines **they** changed are re-indented
+   from the language's syntax (HTML with its `<style>` / `<script>`, CSS, JavaScript, TypeScript) and lose
+   their trailing spaces. Per person, **on by default**; off in Settings → Editor ("Format my code as I
+   type") or with the palette's "Format my code as I type (on / off)" (bindable). Shared code, so it stays
+   out of others' way: a line someone else edits meanwhile is theirs and is left alone (two people indenting
+   one line would get the indentation twice); the caret's line keeps its trailing space and, when blank, its
+   indentation; whitespace that is the page's content is kept (template strings, `<pre>`, `<textarea>`).
+   Its own undo step: Undo puts the code back as typed (and it is not formatted again). The "Format file"
+   command (Shift+Alt+F …) still formats a whole file on demand.
+
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04; typescript 2026-11-06)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,
 y-codemirror.next, @replit/codemirror-vim, @replit/codemirror-emacs, **typescript 6.0.3** (Microsoft,
