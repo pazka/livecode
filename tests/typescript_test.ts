@@ -277,3 +277,33 @@ Deno.test("typescript: format — JavaScript too; quotes, semicolons and templat
   // half-typed code is still formatted where it can be, never thrown on
   assertStringIncludes(formatted("function f(a,b){\nreturn (a+\n", "js"), "function f(a, b) {");
 });
+
+Deno.test("typescript: definition — a use leads to the declaration; the declaration to its other uses", () => {
+  const src =
+    "function area(w: number, h: number) {\n  return w * h;\n}\nconst a = area(2, 3);\nconsole.log(area, a, document.title);\n";
+  const at = (needle: string, nth = 0, offset = 1) => {
+    let i = -1;
+    for (let k = 0; k <= nth; k++) i = src.indexOf(needle, i + 1);
+    return i + offset;
+  };
+  const text = (r: { from: number; to: number }) => src.slice(r.from, r.to);
+  // `area(2, 3)` → the function's name
+  const d = service.definition(src, at("area", 1), "ts");
+  assertEquals(d?.kind === "definition" && [d.from, text(d)], [9, "area"]);
+  // a parameter's use → the parameter
+  const p = service.definition(src, at("w * h", 0, 0), "ts");
+  assertEquals(p?.kind === "definition" && [p.from, text(p)], [14, "w"]);
+  // on the declaration: every other use, in order
+  const u = service.definition(src, at("area", 0), "ts");
+  assertEquals(u?.kind === "uses" && u.ranges.map((r) => r.from), [at("area", 1, 0), at("area", 2, 0)]);
+  // the browser's own
+  assertEquals(service.definition(src, at("document"), "ts")?.kind, "library");
+  assertEquals(service.definition(src, at("title"), "ts")?.kind, "library");
+  // `return` leads to its function (as in VS Code); a number leads nowhere
+  assertEquals(service.definition(src, at("return"), "ts")?.kind, "definition");
+  assertEquals(service.definition(src, at("2, 3", 0, 0), "ts"), null);
+  // JavaScript too
+  const js = "const n = 1;\nfunction f() { return n + 1 }\nf();";
+  const j = service.definition(js, js.lastIndexOf("n +"), "js");
+  assertEquals(j?.kind === "definition" && j.from, 6);
+});

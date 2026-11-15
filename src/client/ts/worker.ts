@@ -21,6 +21,7 @@ const api: TsApi = {
   transpile: (text) => service.transpile(text),
   rename: (text, pos, lang) => service.rename(text, pos, lang),
   format: (text, lang, indent) => service.format(text, lang, indent),
+  definition: (text, pos, lang) => service.definition(text, pos, lang),
 };
 
 scope.onmessage = (e) => {

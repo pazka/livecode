@@ -108,6 +108,8 @@ from disk it shows the same page as the preview (CSS applied, script running). T
 code as I type" turns it off). With TypeScript on, `const n: number = "a"`: resting the mouse on the
 underlined `n` (or on the red message at the line's end) opens a box with the whole message. Typing
 `const p:P={x:1}` then Ctrl+S: the line becomes `const p: P = { x: 1 }` (in a JavaScript room too).
+Ctrl/⌘+click on a function's use in the script puts the caret on its declaration; on `".go"` inside
+`querySelector(".go")` it opens index.html on the element with that class.
 
 ## 4. What runs
 | Item | Value |

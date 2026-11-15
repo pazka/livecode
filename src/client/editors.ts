@@ -60,6 +60,7 @@ import { tsClient, tsCompletionSource, typescriptEditor, typescriptSupport } fro
 import { renameExtension } from "./rename.ts";
 import { type MouseMods, mouseMods } from "./keys.ts";
 import { autoFormat } from "./autoformat.ts";
+import { gotoDefinitionConfig, gotoMouse, type Target } from "./gotodef.ts";
 
 /** The script's language, shared by the room (meta "jsLang"). */
 export type ScriptLang = "js" | "ts";
@@ -214,6 +215,8 @@ export interface FileOptions {
   scriptLang?: ScriptLang;
   /** Where the other people's carets are in this file (formatting leaves their lines alone). */
   othersCarets?: () => number[];
+  /** Shows a place of one of the files (go to the code: gotodef.ts). */
+  openAt?: (t: Target) => void;
 }
 
 export class SharedEditor {
@@ -267,6 +270,12 @@ export class SharedEditor {
         this.tabs.of(tabExtension(opts.tabSize)),
         this.wrap.of(opts.lineWrap ? EditorView.lineWrapping : []),
         this.format.of(this.formatExtension(opts.autoFormat)),
+        gotoDefinitionConfig({
+          file,
+          lang: () => this.scriptLang,
+          texts,
+          open: fileOpts.openAt ?? (() => {}),
+        }),
         yCollab(ytext, awareness, { undoManager: false }),
         crowdedNames,
         errorDisplay,
@@ -366,8 +375,10 @@ function addCaretClick(e: MouseEvent, view: EditorView): boolean {
  * Multiple cursors with the mouse: a click with the preset's modifier adds a cursor (Mod+click too, in every
  * preset), a drag with its column modifier selects a column (a box, one cursor per line).
  */
-function mouseExtension(m: { addCursor: MouseMods; column: MouseMods }): Extension {
+function mouseExtension(m: { addCursor: MouseMods; column: MouseMods; goto: MouseMods }): Extension {
   return [
+    // a click with the preset's "go to the code" gesture on a name (gotodef.ts); else the click as below
+    gotoMouse(m.goto),
     EditorView.clickAddsSelectionRange.of((e) => mouseMods(e, m.addCursor) || mouseMods(e, "Mod")),
     // with Shift in the gesture (JetBrains Alt+Shift+click), CodeMirror would extend the selection instead:
     // add (or, on an existing caret, remove) the caret here ourselves

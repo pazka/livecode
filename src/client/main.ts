@@ -192,9 +192,31 @@ function startRoom(roomId: string) {
         if (file === current) $("sb-pos").textContent = `Ln ${line}, Col ${col}`;
       },
       (g) => texts[g].toString(),
-      { othersCarets: () => othersCarets(f) },
+      { othersCarets: () => othersCarets(f), openAt: (t) => openAt(t) },
     ),
   ])) as Record<FileId, SharedEditor>;
+
+  // --- go to the code (gotodef.ts) and back ---
+  const jumps: { file: FileId; pos: number }[] = [];
+  /** The caret on a place of a file, in view (its tab opens); `remember`: "Go back" returns from it. */
+  function showPlace(file: FileId, pos: number) {
+    selectTab(file, true);
+    const view = editors[file].view;
+    const at = Math.max(0, Math.min(view.state.doc.length, pos));
+    view.dispatch({ selection: { anchor: at }, effects: EditorView.scrollIntoView(at, { y: "center" }) });
+    view.focus();
+    announce(`${FILE_NAMES[file]}, line ${view.state.doc.lineAt(at).number}`);
+  }
+  function openAt(t: { file: FileId; from: number }) {
+    jumps.push({ file: current, pos: editors[current].view.state.selection.main.head });
+    if (jumps.length > 50) jumps.shift();
+    showPlace(t.file, t.from);
+  }
+  function goBack() {
+    const j = jumps.pop();
+    if (!j) return announce("Nowhere to go back to");
+    showPlace(j.file, j.pos);
+  }
 
   /** Where the other people's carets (and selection ends) are in a file: formatting leaves those lines. */
   function othersCarets(f: FileId): number[] {
@@ -1086,6 +1108,7 @@ function startRoom(roomId: string) {
     fontBigger: () => settings.update({ fontSize: settings.get().fontSize + 1 }),
     fontSmaller: () => settings.update({ fontSize: settings.get().fontSize - 1 }),
     fontReset: () => settings.update({ fontSize: 14 }),
+    goBack,
     copyLink: () => {
       navigator.clipboard.writeText(location.href).then(
         () => {
@@ -1218,6 +1241,10 @@ function startRoom(roomId: string) {
 
   // --- vim: ex commands + user mappings ---
   Vim.defineEx("write", "w", () => saveAndRun());
+  // gd: go to the code of the name under the cursor (mapped in applyVimrc: mapclear drops added keys)
+  Vim.defineAction("lcGotoDefinition", () => {
+    runCommand("gotoDefinition", editors[current].view);
+  });
   Vim.defineEx("edit", "e", (_cm: unknown, params: { args?: string[] }) => {
     const a = (params.args?.[0] ?? "").toLowerCase();
     const f = a.startsWith("c") ? "css" : a.startsWith("j") ? "js" : a.startsWith("h") ? "html" : null;
@@ -1226,6 +1253,9 @@ function startRoom(roomId: string) {
   function applyVimrc(src: string) {
     try {
       Vim.mapclear();
+    } catch { /* older API */ }
+    try {
+      Vim.mapCommand("gd", "action", "lcGotoDefinition", {}, { context: "normal" });
     } catch { /* older API */ }
     const bad: number[] = [];
     src.split("\n").forEach((line, i) => {
@@ -1324,6 +1354,11 @@ function startRoom(roomId: string) {
         h("dd", { text: "Add a cursor (click again on it to remove it)" }),
         h("dt", { text: displayMouse(preset.mouse.column, "Drag") }),
         h("dd", { text: "Column (box) selection: one cursor per line" }),
+        h("dt", { text: displayMouse(preset.mouse.goto, "Click") }),
+        h("dd", {
+          text: "On a name: go to its code — a function or variable of the script, a class or an id " +
+            "across the three files",
+        }),
       ),
     );
   }

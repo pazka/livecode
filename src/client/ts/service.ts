@@ -75,6 +75,16 @@ export type RenameResult =
   }
   | { ok: false; message: string };
 
+/** Where "go to definition" leads from a place of the script. */
+export type DefinitionResult =
+  /** The name's declaration, in the script. */
+  | { kind: "definition"; from: number; to: number }
+  /** The place asked about is the declaration itself: every other use of the name, in order. */
+  | { kind: "uses"; ranges: { from: number; to: number }[] }
+  /** Declared outside the script: the browser's own (`document`, `Math` …) or a module from a URL. */
+  | { kind: "library"; name: string }
+  | null;
+
 /** One change of a formatting: `insert` replaces the text from `from` to `to`. */
 export interface TextEdit {
   from: number;
@@ -197,6 +207,24 @@ export class ScriptService {
     return edits
       .map((e) => ({ from: e.span.start, to: e.span.start + e.span.length, insert: e.newText }))
       .sort((a, b) => a.from - b.from);
+  }
+
+  /** The declaration of the name at `pos` — or, on the declaration itself, its other uses. */
+  definition(text: string, pos: number, lang: "ts" | "js" = "ts"): DefinitionResult {
+    const file = this.fileOf(text, lang);
+    const defs = this.ls.getDefinitionAtPosition(file, pos);
+    if (!defs?.length) return null;
+    const own = defs.filter((d) => d.fileName === file);
+    if (!own.length) return { kind: "library", name: defs[0].name };
+    const span = (s: TS.TextSpan) => ({ from: s.start, to: s.start + s.length });
+    const here = own.find((d) => d.textSpan.start <= pos && pos <= d.textSpan.start + d.textSpan.length);
+    if (!here) return { kind: "definition", ...span(own[0].textSpan) };
+    const ranges = (this.ls.getReferencesAtPosition(file, pos) ?? [])
+      .filter((r) => r.fileName === file)
+      .map((r) => span(r.textSpan))
+      .filter((r) => !(r.from <= pos && pos <= r.to))
+      .sort((a, b) => a.from - b.from);
+    return { kind: "uses", ranges };
   }
 
   rename(text: string, pos: number, lang: "ts" | "js" = "ts"): RenameResult {

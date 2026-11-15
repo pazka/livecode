@@ -155,6 +155,8 @@ export const editorTheme = EditorView.theme({
     whiteSpace: "pre",
     userSelect: "none",
   },
+  // "go to the code": the name under the mouse while the gesture's key is held (gotodef.ts)
+  ".cm-lc-link": { textDecoration: "underline", textUnderlineOffset: "3px", cursor: "pointer" },
   // the whole message of an error (hover on the underlined code or on the message; "Show the full error")
   ".cm-lc-errorInfo": {
     maxWidth: "40rem",

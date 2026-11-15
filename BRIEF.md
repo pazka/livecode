@@ -165,6 +165,24 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
    minifier picks ("$1 is not defined": the TypeScript worker would not start) — `scripts/embed.ts` repairs
    it (`scripts/bundlefix.ts`, unit-tested) before embedding.
 
+26. **Go to the code** (owner, 2026-11-15: *"the ability to go to the code when I click on a reference with the
+   usual control, it can be cmd click or alt click depending on the keymap and mac or windows machine"*):
+   - **Mouse, as in each editor**: VS Code and JetBrains **Ctrl+click** (⌘+click on a Mac); Sublime, Vim and
+     Emacs **Alt+click** (⌥+click) — there Ctrl/⌘+click is the editor's own "add a cursor". While the key is
+     held, the name under the mouse is underlined. Keyboard help lists the gesture of the current keymap.
+   - **Keyboard** ("Go to the code of the name at the cursor", bindable): VS Code and Sublime **F12**,
+     JetBrains **Ctrl/⌘+B**, Emacs **M-.**, Vim **gd**.
+   - **The script (JavaScript or TypeScript)**: the TypeScript service finds the declaration of a function,
+     variable, class, type, property or parameter. On the declaration itself: its next use (they cycle). The
+     browser's own names (`document`, `Math` …) have no code here: a message says so.
+   - **Across the three files**: a class or an id in a selector of the script (`querySelector(".card")`,
+     `getElementById("out")`, `classList.add("on")`) or of the stylesheet goes to the element in the HTML;
+     `class="…"` / `id="…"` (also `for`, `href="#…"`, `aria-controls` …) in the HTML goes to the stylesheet's
+     rule, else to the script that names it; `var(--gap)` goes to where `--gap` is set.
+   - **Go back** returns to where the jump started (VS Code Alt+← / Mac Ctrl+-, JetBrains Ctrl/⌘+Alt+←, Sublime
+     Alt+- / Mac Ctrl+-, Emacs M-,; in the palette).
+   - A Ctrl/⌘+click that leads nowhere (empty space, a number) still adds a cursor, as before (feature 18).
+
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04; typescript 2026-11-06)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,
 y-codemirror.next, @replit/codemirror-vim, @replit/codemirror-emacs, **typescript 6.0.3** (Microsoft,

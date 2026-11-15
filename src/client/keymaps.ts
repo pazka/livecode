@@ -24,8 +24,10 @@ export interface Preset {
    * Multiple cursors with the mouse, as in that editor: click with `addCursor` adds a cursor (Mod+click too, in
    * every preset), drag with `column` selects a column (a box). VS Code: Alt+click, Shift+Alt+drag; JetBrains:
    * Alt+Shift+click, Alt+drag; others: CodeMirror's Mod+click, Alt+drag.
+   * Click with `goto` on a name goes to its code (gotodef.ts): Ctrl/⌘+click in VS Code and JetBrains; Alt+click
+   * where Ctrl/⌘+click is the editor's own "add a cursor" (Sublime, Vim, Emacs).
    */
-  mouse: { addCursor: MouseMods; column: MouseMods };
+  mouse: { addCursor: MouseMods; column: MouseMods; goto: MouseMods };
 }
 
 // App commands that read the same in most presets.
@@ -63,6 +65,7 @@ const COMMON_APP: Bindings = {
   fontBigger: [],
   fontSmaller: [],
   fontReset: [],
+  goBack: [],
   copyLink: [],
   exportPage: [],
   newRoom: [],
@@ -86,6 +89,7 @@ const NO_EDITOR: Bindings = {
   startCompletion: [],
   showType: [],
   showError: [],
+  gotoDefinition: [],
   renameSymbol: [],
   selectAll: [],
   selectLine: [],
@@ -113,7 +117,7 @@ export const PRESETS: Preset[] = [
     id: "vscode",
     label: "VS Code",
     ext: null,
-    mouse: { addCursor: "Alt", column: "Alt-Shift" },
+    mouse: { addCursor: "Alt", column: "Alt-Shift", goto: "Mod" },
     bindings: {
       ...NO_EDITOR,
       ...COMMON_APP,
@@ -132,6 +136,8 @@ export const PRESETS: Preset[] = [
       startCompletion: ["Ctrl-Space"],
       showType: ["Mod-k Mod-i"],
       renameSymbol: ["F2"],
+      gotoDefinition: ["F12"],
+      goBack: IS_MAC ? ["Ctrl--"] : ["Alt-ArrowLeft"], // VS Code "Go Back"
       selectAll: ["Mod-a"],
       selectLine: ["Mod-l"],
       selectNextOccurrence: ["Mod-d"],
@@ -163,7 +169,7 @@ export const PRESETS: Preset[] = [
     id: "jetbrains",
     label: "JetBrains (IntelliJ, WebStorm…)",
     ext: null,
-    mouse: { addCursor: "Alt-Shift", column: "Alt" },
+    mouse: { addCursor: "Alt-Shift", column: "Alt", goto: "Mod" },
     bindings: {
       ...NO_EDITOR,
       ...COMMON_APP,
@@ -179,6 +185,8 @@ export const PRESETS: Preset[] = [
       reindent: ["Mod-Alt-l"],
       startCompletion: ["Ctrl-Space"],
       renameSymbol: ["Shift-F6"],
+      gotoDefinition: ["Mod-b"], // "Go to Declaration or Usages"
+      goBack: ["Mod-Alt-ArrowLeft"], // "Navigate Back"
       showError: ["Mod-F1"], // JetBrains "Error Description"
       selectAll: ["Mod-a"],
       selectNextOccurrence: ["Alt-j"],
@@ -212,10 +220,12 @@ export const PRESETS: Preset[] = [
     id: "sublime",
     label: "Sublime Text",
     ext: null,
-    mouse: { addCursor: "Mod", column: "Alt" },
+    mouse: { addCursor: "Mod", column: "Alt", goto: "Alt" },
     bindings: {
       ...NO_EDITOR,
       ...COMMON_APP,
+      gotoDefinition: ["F12"],
+      goBack: IS_MAC ? ["Ctrl--"] : ["Alt--"], // "Jump Back"
       undo: ["Mod-z"],
       redo: ["Mod-Shift-z", "Mod-y"],
       toggleComment: ["Mod-/"],
@@ -254,7 +264,7 @@ export const PRESETS: Preset[] = [
     id: "vim",
     label: "Vim",
     ext: "vim",
-    mouse: { addCursor: "Mod", column: "Alt" },
+    mouse: { addCursor: "Mod", column: "Alt", goto: "Alt" },
     bindings: {
       ...NO_EDITOR,
       ...COMMON_APP,
@@ -267,10 +277,12 @@ export const PRESETS: Preset[] = [
     id: "emacs",
     label: "Emacs",
     ext: "emacs",
-    mouse: { addCursor: "Mod", column: "Alt" },
+    mouse: { addCursor: "Mod", column: "Alt", goto: "Alt" },
     bindings: {
       ...NO_EDITOR,
       ...COMMON_APP,
+      gotoDefinition: ["Alt-."], // M-. (xref-find-definitions)
+      goBack: ["Alt-,"], // M-, (xref-go-back)
       // no Ctrl-x / Ctrl-c / Ctrl-h chords here: they would swallow the Emacs prefixes
       toggleComment: ["Alt-;"],
       startCompletion: ["Alt-/"],

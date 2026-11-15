@@ -40,6 +40,7 @@ import { showTypeAtCursor } from "./ts/client.ts";
 import { renameSymbol } from "./rename.ts";
 import { showErrorAtCursor } from "./diagnostics.ts";
 import { canFormatFile, formatFile } from "./autoformat.ts";
+import { goToDefinition } from "./gotodef.ts";
 import { announce } from "./ui/dom.ts";
 
 /**
@@ -122,6 +123,12 @@ export const EDITOR_COMMANDS: EditorCommand[] = [
     "Edit",
     (view) => showErrorAtCursor(view, announce),
   ),
+  ed(
+    "gotoDefinition",
+    "Go to the code of the name at the cursor (definition; on it, the next use)",
+    "Edit",
+    (view) => goToDefinition(view, announce),
+  ),
   ed("renameSymbol", "Rename (every use of the name)", "Edit", (view) => renameSymbol(view, announce)),
   ed("selectAll", "Select all", "Selection", selectAll),
   ed("selectLine", "Select line", "Selection", selectLine),
@@ -182,6 +189,7 @@ export const APP_COMMANDS: AppCommand[] = [
   app("fontBigger", "Bigger editor font", "View"),
   app("fontSmaller", "Smaller editor font", "View"),
   app("fontReset", "Default editor font size", "View"),
+  app("goBack", "Go back to where you were before the last jump", "Files"),
   app("copyLink", "Copy the room link", "Room"),
   app("exportPage", "Download the page as one HTML file (<room>.html) to share", "Room"),
   app("newRoom", "Open a new empty room", "Room"),
