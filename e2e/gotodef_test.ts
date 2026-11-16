@@ -84,6 +84,17 @@ const place = `(() => {
   return f + " " + m[1] + ":" + m[2];
 })()`;
 const cursors = (p: Page, f: F) => p.locator(`#panel-${f} .cm-cursorLayer .cm-cursor`).count();
+/** The file shows `want` cursors (polled: CodeMirror draws them on its next frame). */
+async function expectCursors(p: Page, f: F, want: number, what = "") {
+  let got = -1;
+  const end = Date.now() + 3000;
+  do {
+    got = await cursors(p, f);
+    if (got === want) return;
+    await sleep(75);
+  } while (Date.now() < end);
+  throw new Error(`${what ? what + ": " : ""}${got} cursors, want ${want}`);
+}
 
 async function settings(p: Page, patch: Record<string, unknown>) {
   await p.evaluate((patch) => {
@@ -171,7 +182,7 @@ Deno.test({
         await script();
         await modClick("js", "area", 1, ["Control"]); // `area(2, 3)`
         await expectTrue(a, `${place} === "js 1:10"`, "caret on the function's name");
-        if (await cursors(a, "js") !== 1) throw new Error(`${await cursors(a, "js")} cursors`);
+        await expectCursors(a, "js", 1);
       });
 
       await check("Ctrl+click on the declaration goes to its next use", async () => {
@@ -202,7 +213,7 @@ Deno.test({
         await script();
         await modClick("js", "2, 3", 0, ["Control"]); // a number: nothing
         await sleep(600);
-        if (await cursors(a, "js") !== 2) throw new Error(`${await cursors(a, "js")} cursors`);
+        await expectCursors(a, "js", 2);
         await a.keyboard.press("Escape");
       });
 
@@ -286,7 +297,7 @@ Deno.test({
           await script();
           await modClick("js", "area", 1, ["Control"]);
           await sleep(500);
-          if (await cursors(a, "js") !== 2) throw new Error(`Ctrl+click: ${await cursors(a, "js")} cursors`);
+          await expectCursors(a, "js", 2, "Ctrl+click");
           await a.keyboard.press("Escape");
           const pt = await wordPoint(a, "js", "big", 1);
           await a.mouse.click(pt.x, pt.y);
