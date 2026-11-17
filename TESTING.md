@@ -56,9 +56,9 @@ server creates from the fixed starter (`src/shared/starter.ts`); the 3 widths of
 - Keymaps other than VS Code (Vim, Emacs...), every theme except light, dark and high contrast dark.
 - Banners (disconnected, room full, limits): they need the server in a failing state.
 
-**Known layout issue, recorded in the baselines as it is today:** at 390 px the room page is wider than
-the screen (about 468 px: the file tools of the code area and the status bar overflow), so the phone
-shows a horizontal scroll. The baselines show it; a fix will change them on purpose.
+**Phone layout (hub #33, fixed 2026-11-17):** at 390 px the room page fits the screen (no horizontal
+scroll; every 390 shot is 390 px wide, so a page that grows wider fails on its size). The code-area header
+wraps (switches and file tools on a second line) and the status bar wraps whole items.
 
 **Renewing the baselines** (only in a PR that says the visual change is wanted):
 `docker build -t livecode:local . && bash visual/run.sh livecode:local --update`, look at every changed
