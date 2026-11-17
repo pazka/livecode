@@ -10,3 +10,4 @@ node_modules/
 dist/
 src/server/assets.gen.ts
 src/client/ts/libs.gen.ts
+visual/out/
