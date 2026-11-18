@@ -141,13 +141,13 @@ export function makeHandler(deps: Deps) {
       res.headers.set("x-request-id", reqId);
       return res;
     }
-    // a WebSocket upgrade (101) keeps Deno's own headers; every other answer carries the request id
-    if (res.status !== 101) res.headers.set("x-request-id", reqId);
+    // every answer carries the request id, the WebSocket upgrade (101) included
+    res.headers.set("x-request-id", reqId);
     // Requests are Traefik's job: log only what matters (5xx, refused WebSocket origin, slow), the rest at debug.
     const l = line(res.status);
     if (res.status >= 500) log("error", "http", "server error", l);
     else if (res.status === 403) log("warn", "http", "refused", l);
-    else if (l.dur_ms > SLOW_MS && res.status !== 101) log("warn", "http", "slow request", l);
+    else if (l.dur_ms > SLOW_MS) log("warn", "http", "slow request", l);
     else if (logEnabled("debug")) log("debug", "http", "request", l);
     return res;
   };

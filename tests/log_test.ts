@@ -7,7 +7,8 @@ import { loadConfig } from "../src/server/config.ts";
 import { logShutdown, logStartup } from "../src/server/lifecycle.ts";
 import { errField, log, roomTag, setLogLevel, setLogSink, setLogVersion } from "../src/server/log.ts";
 import { Store } from "../src/server/store.ts";
-import { startServer } from "./helpers.ts";
+import { sleep, startServer } from "./helpers.ts";
+import { YClient } from "../src/server/yclient.ts";
 
 const opts = { sanitizeOps: false, sanitizeResources: false };
 const TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -209,6 +210,106 @@ Deno.test({
       assertEquals(typeof recs[1].dur_ms, "number");
       assertEquals(typeof recs[1].stored, "number");
     } finally {
+      await srv.stop();
+    }
+  },
+});
+
+Deno.test({
+  name: "log: a request slower than 1 s gives one warn line with the route template, status and dur_ms",
+  ...opts,
+  async fn() {
+    const srv = await startServer();
+    try {
+      const orig = srv.rooms.store.probe.bind(srv.rooms.store);
+      srv.rooms.store.probe = async () => {
+        await sleep(1100);
+        return orig();
+      };
+      let res!: Response;
+      const recs = await capture("info", async () => {
+        res = await fetch(`${srv.base}/healthz?token=zz`, { headers: { "x-request-id": "qa-slow-1" } });
+        await res.body?.cancel();
+      });
+      assertEquals(res.status, 200);
+      assertEquals(recs.length, 1, JSON.stringify(recs));
+      const s = recs[0];
+      checkFormat(s);
+      assertEquals([s.level, s.event, s.msg, s.req_id, s.method, s.route, s.status], [
+        "warn",
+        "http",
+        "slow request",
+        "qa-slow-1",
+        "GET",
+        "/healthz",
+        200,
+      ]);
+      assert(typeof s.dur_ms === "number" && s.dur_ms > 1000, `dur_ms ${s.dur_ms}`);
+      assert(!JSON.stringify(s).includes("token"), JSON.stringify(s));
+    } finally {
+      await srv.stop();
+    }
+  },
+});
+
+/** Sends a raw WebSocket upgrade and returns the status line and headers of the answer. */
+async function rawUpgrade(
+  base: string,
+  path: string,
+  reqId?: string,
+): Promise<{ status: number; headers: Headers }> {
+  const port = Number(new URL(base).port);
+  const conn = await Deno.connect({ hostname: "127.0.0.1", port });
+  try {
+    const lines = [
+      `GET ${path} HTTP/1.1`,
+      `Host: 127.0.0.1:${port}`,
+      "Upgrade: websocket",
+      "Connection: Upgrade",
+      "Sec-WebSocket-Version: 13",
+      "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+      ...(reqId ? [`X-Request-Id: ${reqId}`] : []),
+    ];
+    await conn.write(new TextEncoder().encode(lines.join("\r\n") + "\r\n\r\n"));
+    let head = "";
+    const buf = new Uint8Array(4096);
+    while (!head.includes("\r\n\r\n")) {
+      const n = await conn.read(buf);
+      if (n === null) break;
+      head += new TextDecoder().decode(buf.subarray(0, n));
+    }
+    const [statusLine, ...rest] = head.split("\r\n\r\n")[0].split("\r\n");
+    const headers = new Headers();
+    for (const l of rest) {
+      const i = l.indexOf(":");
+      headers.append(l.slice(0, i).trim(), l.slice(i + 1).trim());
+    }
+    return { status: Number(statusLine.split(" ")[1]), headers };
+  } finally {
+    conn.close();
+  }
+}
+
+Deno.test({
+  name: "log: the WebSocket upgrade (101) returns x-request-id, and the socket still works",
+  ...opts,
+  async fn() {
+    const srv = await startServer();
+    const a = new YClient(`${srv.ws}/ws/req-id-room`);
+    try {
+      const echoed = await rawUpgrade(srv.base, "/ws/req-id-room", "qa-ws-1");
+      assertEquals(echoed.status, 101);
+      assertEquals(echoed.headers.get("x-request-id"), "qa-ws-1");
+      assertEquals(echoed.headers.get("upgrade")?.toLowerCase(), "websocket");
+      assert(echoed.headers.get("sec-websocket-accept"), "Deno's own upgrade headers are kept");
+      const generated = await rawUpgrade(srv.base, "/ws/req-id-room");
+      assertEquals(generated.status, 101);
+      assertMatch(generated.headers.get("x-request-id") ?? "", /^[0-9a-f-]{36}$/);
+      // a real client in the same room still gets the document and syncs
+      await a.ready();
+      assert(a.text("css").includes("font-family"));
+    } finally {
+      await a.close();
       await srv.stop();
     }
   },
