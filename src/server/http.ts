@@ -3,7 +3,7 @@
 
 import { CLOSE_FULL, isRoomId, newRoomId } from "../shared/protocol.ts";
 import type { Config } from "./config.ts";
-import { log } from "./log.ts";
+import { errField, log, logEnabled, roomTag } from "./log.ts";
 import { clientIp, originAllowed } from "./net.ts";
 import { type Conn, encodeNotice, type Room, type RoomManager } from "./rooms.ts";
 
@@ -102,29 +102,53 @@ export interface Deps {
   startedAt?: number;
 }
 
+/** The route template of a path, never the raw path: room ids are capability URLs. */
+export function routeTemplate(path: string, assets: Map<string, Asset>): string {
+  if (path.startsWith("/ws/")) return "/ws/:room";
+  if (path.startsWith("/r/")) return path.endsWith("/view") ? "/r/:room/view" : "/r/:room";
+  if (["/", "/healthz", "/robots.txt", "/new", "/preview", "/preview.js"].includes(path)) return path;
+  if (assets.has(path) && path !== "/index.html" && path !== "/preview.html") return "/:asset";
+  return "/:other";
+}
+
+/** X-Request-Id from the edge when it is a plain token, else a new one. */
+function requestId(req: Request): string {
+  const given = req.headers.get("x-request-id");
+  return given && /^[A-Za-z0-9._:-]{1,128}$/.test(given) ? given : crypto.randomUUID();
+}
+
+const SLOW_MS = 1000;
+
 export function makeHandler(deps: Deps) {
   const startedAt = deps.startedAt ?? Date.now();
   return async (req: Request, info: Deno.ServeHandlerInfo<Deno.NetAddr>): Promise<Response> => {
     const t0 = performance.now();
     const url = new URL(req.url);
+    const reqId = requestId(req);
+    const line = (status: number) => ({
+      req_id: reqId,
+      method: req.method,
+      route: routeTemplate(url.pathname, deps.assets),
+      status,
+      dur_ms: Math.round(performance.now() - t0),
+    });
     let res: Response;
     try {
       res = await route(req, url, info, deps, startedAt);
     } catch (e) {
-      log("error", "handler error", {
-        path: url.pathname.slice(0, 64),
-        error: e instanceof Error ? e.name : "error",
-      });
       res = json({ error: "internal" }, 500, false);
+      log("error", "request_failed", "unhandled error in a request", { ...line(500), ...errField(e) });
+      res.headers.set("x-request-id", reqId);
+      return res;
     }
-    if (url.pathname !== "/healthz" && res.status !== 101) {
-      log("debug", "req", {
-        method: req.method,
-        path: url.pathname.startsWith("/r/") ? "/r/:room" : url.pathname.slice(0, 64),
-        status: res.status,
-        ms: Math.round(performance.now() - t0),
-      });
-    }
+    // a WebSocket upgrade (101) keeps Deno's own headers; every other answer carries the request id
+    if (res.status !== 101) res.headers.set("x-request-id", reqId);
+    // Requests are Traefik's job: log only what matters (5xx, refused WebSocket origin, slow), the rest at debug.
+    const l = line(res.status);
+    if (res.status >= 500) log("error", "http", "server error", l);
+    else if (res.status === 403) log("warn", "http", "refused", l);
+    else if (l.dur_ms > SLOW_MS && res.status !== 101) log("warn", "http", "slow request", l);
+    else if (logEnabled("debug")) log("debug", "http", "request", l);
     return res;
   };
 }
@@ -254,7 +278,7 @@ function upgrade(
       }
       for (const m of early.splice(0)) r.handle(conn, m);
     } catch (e) {
-      log("error", "join failed", { error: String(e) });
+      log("error", "ws_join_failed", "joining a room failed", { room: roomTag(id), ...errField(e, [id]) });
       conn.close(1011, "internal error");
     }
   };
@@ -268,7 +292,11 @@ function upgrade(
   socket.onclose = () => {
     closed = true;
     if (admitted) rooms.release(conn);
-    if (room) void rooms.leave(room, conn).catch((e) => log("error", "leave failed", { error: String(e) }));
+    if (room) {
+      void rooms.leave(room, conn).catch((e) =>
+        log("error", "ws_leave_failed", "leaving a room failed", { room: roomTag(id), ...errField(e, [id]) })
+      );
+    }
   };
   socket.onerror = () => {/* onclose follows */};
   return response;

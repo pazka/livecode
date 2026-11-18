@@ -62,7 +62,7 @@ All optional; `.env.example` holds the box values. Nobody needs to edit the file
 | `APP_BIND` | `127.0.0.1:9134` | loopback port published for Traefik |
 | `APP_BASE_URL` | `https://code.hosh.it` | public origin; browsers may open room WebSockets only from it |
 | `APP_TRUSTED_PROXIES` | `127.0.0.0/8,::1/128,172.16.0.0/12` | X-Forwarded-For trusted only from these peers |
-| `APP_LOG_LEVEL` | `info` | `debug` logs every request (room ids never logged, only a hash tag) |
+| `APP_LOG_LEVEL` | `info` | `debug` logs every request; `info` logs only 5xx, refused origins and slow requests (JSON lines, TESTING.md "Logs"; room ids never logged, only a hash tag) |
 | `LIVECODE_ROOM_TTL_DAYS` | `7` | a room idle this long (nobody opened, edited or left it) is deleted; smoke rooms after 1 h |
 | `LIVECODE_MAX_FILE_KB` | `128` | characters per file: the editor refuses more, the server cuts back beyond it |
 | `LIVECODE_MAX_DOC_KB` | `640` | encoded size of one room (3 files + edit history); edits beyond are refused |

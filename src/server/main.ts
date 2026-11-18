@@ -3,7 +3,8 @@
 import { loadAssets } from "./assets.ts";
 import { loadConfig } from "./config.ts";
 import { makeHandler } from "./http.ts";
-import { log, setLogLevel } from "./log.ts";
+import { logShutdown, logStartup } from "./lifecycle.ts";
+import { setLogLevel, setLogVersion } from "./log.ts";
 import { RoomManager } from "./rooms.ts";
 import { runSmoke } from "./smoke.ts";
 import { Store } from "./store.ts";
@@ -11,15 +12,17 @@ import { Store } from "./store.ts";
 async function serve() {
   const cfg = loadConfig();
   setLogLevel(cfg.logLevel);
+  setLogVersion(cfg.version);
   const store = new Store(cfg.dataDir);
   await store.init();
   const rooms = new RoomManager(store, cfg.limits);
   rooms.startGc();
   const handler = makeHandler({ cfg, rooms, assets: loadAssets() });
   const ctl = new AbortController();
+  let signal = "";
   for (const sig of ["SIGTERM", "SIGINT"] as const) {
     Deno.addSignalListener(sig, () => {
-      log("info", "shutdown", { signal: sig });
+      signal = sig;
       ctl.abort();
     });
   }
@@ -27,11 +30,12 @@ async function serve() {
     hostname: "0.0.0.0",
     port: cfg.port,
     signal: ctl.signal,
-    onListen: ({ port }) => log("info", "listening", { port, version: cfg.version, rooms: store.stored }),
+    onListen: ({ port }) => void logStartup(cfg, store, port),
   }, handler);
   await server.finished;
+  const t0 = performance.now();
   await rooms.close(); // flush unsaved edits
-  log("info", "stopped");
+  logShutdown(signal, performance.now() - t0);
 }
 
 async function healthcheck(base: string): Promise<number> {

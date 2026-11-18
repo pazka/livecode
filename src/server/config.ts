@@ -78,11 +78,38 @@ function int(v: string | undefined, def: number, lo: number, hi: number): number
   return Number.isInteger(n) && n >= lo && n <= hi ? n : def;
 }
 
+/** Every environment variable the config reads (the startup line lists those that are set, never their values). */
+export const CONFIG_ENV = [
+  "APP_DATA_DIR",
+  "APP_PORT",
+  "APP_LOG_LEVEL",
+  "LOG_LEVEL",
+  "APP_BASE_URL",
+  "APP_TRUSTED_PROXIES",
+  "LIVECODE_VERSION",
+  "LIVECODE_MAX_ROOMS",
+  "LIVECODE_MAX_STORAGE_MB",
+  "LIVECODE_MAX_LIVE_ROOMS",
+  "LIVECODE_MAX_RSS_MB",
+  "LIVECODE_MAX_FILE_KB",
+  "LIVECODE_MAX_DOC_KB",
+  "LIVECODE_MAX_PEERS_PER_ROOM",
+  "LIVECODE_MAX_CONNS",
+  "LIVECODE_MAX_CONNS_PER_IP",
+  "LIVECODE_NEW_ROOMS_PER_HOUR",
+  "LIVECODE_NEW_ROOMS_PER_HOUR_TOTAL",
+  "LIVECODE_ROOM_TTL_DAYS",
+] as const;
+
+export function configNamesSet(env: (k: string) => string | undefined = (k) => Deno.env.get(k)): string[] {
+  return CONFIG_ENV.filter((k) => env(k) !== undefined && env(k) !== "");
+}
+
 export function loadConfig(env: (k: string) => string | undefined = (k) => Deno.env.get(k)): Config {
   return {
     dataDir: env("APP_DATA_DIR") || "/data",
     port: int(env("APP_PORT"), 8000, 0, 65535),
-    logLevel: env("APP_LOG_LEVEL") || "info",
+    logLevel: env("APP_LOG_LEVEL") || env("LOG_LEVEL") || "info", // LOG_LEVEL: AGENTS.md section 11 name
     baseUrl: (env("APP_BASE_URL") || "https://code.hosh.it").replace(/\/+$/, ""),
     trustedProxies: (env("APP_TRUSTED_PROXIES") ?? "127.0.0.0/8,::1/128,172.16.0.0/12")
       .split(",").map((s) => s.trim()).filter(Boolean),
