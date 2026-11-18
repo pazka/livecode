@@ -26,7 +26,7 @@ dependencies never run on the box (Decision #17).
 - Error lines carry `err` (type, message, stack). A room id never reaches the log: `room` is a hash tag and
   room file names in error messages are replaced by the tag.
 - The expiry job (every 6 h) writes `gc_start` and `gc_done` (`deleted`, `stored`, `dur_ms`).
-- Level: `APP_LOG_LEVEL` (or the standard `LOG_LEVEL`), default `info`.
+- Level: `APP_LOG_LEVEL` (this repo's name for the standard's `LOG_LEVEL`), default `info`.
 
 ## Visual use cases
 

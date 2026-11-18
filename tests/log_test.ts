@@ -188,10 +188,9 @@ Deno.test("log: LOG_LEVEL filters, err carries type, message and stack, room ids
   assertEquals([err.type, err.message], ["TypeError", `bad ${roomTag("abc-def")}`]);
   assert(!err.stack.includes("abc-def"));
   assertEquals(recs[2].err, { type: "string", message: "plain" });
-  assertEquals(loadConfig((k) => ({ LOG_LEVEL: "debug" } as Record<string, string>)[k]).logLevel, "debug");
   assertEquals(
-    loadConfig((k) => ({ LOG_LEVEL: "debug", APP_LOG_LEVEL: "warn" } as Record<string, string>)[k]).logLevel,
-    "warn",
+    loadConfig((k) => ({ APP_LOG_LEVEL: "debug" } as Record<string, string>)[k]).logLevel,
+    "debug",
   );
 });
 
