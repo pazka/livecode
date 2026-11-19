@@ -8,7 +8,7 @@ import { logShutdown, logStartup } from "../src/server/lifecycle.ts";
 import { errField, log, roomTag, setLogLevel, setLogSink, setLogVersion } from "../src/server/log.ts";
 import { Store } from "../src/server/store.ts";
 import { sleep, startServer } from "./helpers.ts";
-import { YClient } from "../src/server/yclient.ts";
+import { until, YClient } from "../src/server/yclient.ts";
 
 const opts = { sanitizeOps: false, sanitizeResources: false };
 const TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -310,6 +310,101 @@ Deno.test({
       assert(a.text("css").includes("font-family"));
     } finally {
       await a.close();
+      await srv.stop();
+    }
+  },
+});
+
+Deno.test({
+  name: "log: a 5xx answer that is not an exception gives one error http line (/healthz 503)",
+  ...opts,
+  async fn() {
+    const srv = await startServer();
+    try {
+      srv.rooms.store.probe = () => Promise.resolve(false); // the volume is not writable: /healthz is 503
+      let res!: Response;
+      const recs = await capture("info", async () => {
+        res = await fetch(`${srv.base}/healthz?token=zz`);
+        await res.body?.cancel();
+      });
+      assertEquals(res.status, 503);
+      assertEquals(recs.length, 1, JSON.stringify(recs));
+      const e = recs[0];
+      checkFormat(e);
+      assertEquals([e.level, e.event, e.method, e.route, e.status], [
+        "error",
+        "http",
+        "GET",
+        "/healthz",
+        503,
+      ]);
+      assertMatch(res.headers.get("x-request-id") ?? "", /^[0-9a-f-]{36}$/);
+      assertEquals(e.req_id, res.headers.get("x-request-id"));
+      assert(!("err" in e), "no err key on a 5xx that is not an exception");
+      assert(!JSON.stringify(e).includes("token"), JSON.stringify(e));
+    } finally {
+      await srv.stop();
+    }
+  },
+});
+
+/** One error line of `event` with err (type, message, stack) and the room tag; the raw id appears nowhere. */
+function checkRoomError(recs: Line[], event: string, id: string) {
+  const mine = recs.filter((r) => r.event === event);
+  assertEquals(mine.length, 1, JSON.stringify(recs));
+  const e = mine[0];
+  checkFormat(e);
+  assertEquals([e.level, e.room], ["error", roomTag(id)]);
+  const err = e.err as Record<string, string>;
+  assertEquals(err.type, "Error");
+  assert(err.message.includes(roomTag(id)), err.message);
+  assert(typeof err.stack === "string" && err.stack.length > 0);
+  for (const r of recs) assert(!JSON.stringify(r).includes(id), JSON.stringify(r));
+}
+
+Deno.test({
+  name: "log: a failed room save gives one room_save_failed error line, the room id hidden",
+  ...opts,
+  async fn() {
+    const id = "qa-secret-save-room";
+    const srv = await startServer();
+    const a = new YClient(`${srv.ws}/ws/${id}`);
+    const realSave = srv.rooms.store.save.bind(srv.rooms.store);
+    try {
+      await a.ready();
+      const room = srv.rooms.rooms.get(id)!;
+      srv.rooms.store.save = () =>
+        Promise.reject(new Error(`EACCES: open '/data/rooms/${id}.ydoc' (room ${id})`));
+      a.doc.getText("js").insert(0, "// edit\n");
+      await until(() => room.dirty, 3000, "edit reaches the server");
+      const recs = await capture("info", () => room.save());
+      checkRoomError(recs, "room_save_failed", id);
+      assert(room.dirty, "the edit stays unsaved and is retried");
+    } finally {
+      srv.rooms.store.save = realSave; // the retry and the final save on stop succeed
+      await a.close();
+      await srv.stop();
+    }
+  },
+});
+
+Deno.test({
+  name: "log: a failed WebSocket join gives one ws_join_failed error line, the room id hidden",
+  ...opts,
+  async fn() {
+    const id = "qa-secret-join-room";
+    const srv = await startServer();
+    srv.rooms.join = () => Promise.reject(new Error(`EIO: read '/data/rooms/${id}.ydoc' (room ${id})`));
+    let a!: YClient;
+    try {
+      const recs = await capture("info", async () => {
+        a = new YClient(`${srv.ws}/ws/${id}`);
+        const ev = await a.closed;
+        assertEquals(ev.code, 1011);
+      });
+      checkRoomError(recs, "ws_join_failed", id);
+    } finally {
+      await a?.close();
       await srv.stop();
     }
   },
