@@ -477,3 +477,34 @@ Deno.test({
     }
   },
 });
+
+Deno.test({
+  name: "log: a real join and leave give one room_open (info) and one room_unloaded (debug), id hidden",
+  ...opts,
+  async fn() {
+    const id = "qa-secret-open-room";
+    const srv = await startServer({ graceMs: 50 });
+    let a!: YClient;
+    try {
+      const recs = await capture("debug", async () => {
+        a = new YClient(`${srv.ws}/ws/${id}`);
+        await a.ready();
+        await a.close();
+        await until(() => !srv.rooms.rooms.has(id), 3000, "the room is unloaded after the grace period");
+      });
+      const open = recs.filter((r) => r.event === "room_open");
+      assertEquals(open.length, 1, JSON.stringify(recs));
+      checkFormat(open[0]);
+      assertEquals([open[0].level, open[0].room, open[0].stored], ["info", roomTag(id), false]);
+      assertEquals(typeof open[0].bytes, "number");
+      const gone = recs.filter((r) => r.event === "room_unloaded");
+      assertEquals(gone.length, 1, JSON.stringify(recs));
+      checkFormat(gone[0]);
+      assertEquals([gone[0].level, gone[0].room], ["debug", roomTag(id)]);
+      for (const r of recs) assert(!JSON.stringify(r).includes(id), JSON.stringify(r));
+    } finally {
+      await a?.close();
+      await srv.stop();
+    }
+  },
+});
