@@ -409,3 +409,71 @@ Deno.test({
     }
   },
 });
+
+Deno.test({
+  name: "log: a failed WebSocket leave gives one ws_leave_failed error line, the room id hidden",
+  ...opts,
+  async fn() {
+    const id = "qa-secret-leave-room";
+    const srv = await startServer();
+    const a = new YClient(`${srv.ws}/ws/${id}`);
+    const realLeave = srv.rooms.leave.bind(srv.rooms);
+    let calls = 0;
+    try {
+      await a.ready();
+      srv.rooms.leave = () => {
+        calls++;
+        return Promise.reject(new Error(`EIO: write '/data/rooms/${id}.ydoc' (room ${id})`));
+      };
+      const recs = await capture("info", async () => {
+        await a.close();
+        await until(() => calls > 0, 3000, "the server sees the close");
+        await sleep(50); // the rejection is logged
+      });
+      assertEquals(calls, 1);
+      checkRoomError(recs, "ws_leave_failed", id);
+    } finally {
+      srv.rooms.leave = realLeave;
+      await a.close();
+      await srv.stop();
+    }
+  },
+});
+
+Deno.test({
+  name: "log: a failed expiry job gives gc_failed error lines (first run and interval), room file hidden",
+  ...opts,
+  async fn() {
+    const id = "qa-secret-gc-room";
+    const srv = await startServer();
+    let calls = 0;
+    srv.rooms.store.gc = () => {
+      calls++;
+      return Promise.reject(new Error(`EACCES: unlink '/data/rooms/${id}.ydoc'`));
+    };
+    try {
+      const recs = await capture("info", async () => {
+        srv.rooms.startGc(30);
+        await until(() => calls >= 2, 3000, "first run and one interval run");
+        await srv.rooms.close(); // stops the timer
+        await sleep(20); // the last rejection is logged
+      });
+      const failed = recs.filter((r) => r.event === "gc_failed");
+      assertEquals(failed.length, calls, JSON.stringify(recs));
+      for (const e of failed) {
+        checkFormat(e);
+        assertEquals(e.level, "error");
+        const err = e.err as Record<string, string>;
+        assertEquals(err.type, "Error");
+        assert(err.message.includes(`rooms/${roomTag(id)}.ydoc`), err.message);
+        assert(typeof err.stack === "string" && err.stack.includes(`rooms/${roomTag(id)}.ydoc`), err.stack);
+      }
+      for (const r of recs) assert(!JSON.stringify(r).includes(id), JSON.stringify(r));
+      const n = calls;
+      await sleep(80);
+      assertEquals(calls, n, "the timer is stopped");
+    } finally {
+      await srv.stop();
+    }
+  },
+});
