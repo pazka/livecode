@@ -19,7 +19,7 @@ import {
 } from "../shared/protocol.ts";
 import { STARTER } from "../shared/starter.ts";
 import type { Limits } from "./config.ts";
-import { log, roomTag } from "./log.ts";
+import { errField, log, roomTag } from "./log.ts";
 import type { Store } from "./store.ts";
 
 export interface Conn {
@@ -149,7 +149,10 @@ export class Room {
         this.saved = true;
       },
       (e) => {
-        log("error", "room save failed", { room: roomTag(this.id), error: String(e) });
+        log("error", "room_save_failed", "room save failed, retry in 5 s", {
+          room: roomTag(this.id),
+          ...errField(e, [this.id]),
+        });
         this.dirty = true;
         this.saveTimer = setTimeout(() => void this.save(), 5000);
       },
@@ -413,7 +416,7 @@ export class RoomManager {
     }
     const room = new Room(id, this.store, this.limits, data);
     this.rooms.set(id, room);
-    log("info", "room open", { room: roomTag(id), stored: data !== null, bytes: room.bytes });
+    log("info", "room_open", "room open", { room: roomTag(id), stored: data !== null, bytes: room.bytes });
     return room;
   }
 
@@ -447,10 +450,13 @@ export class RoomManager {
     if (room.saved) await this.store.touch(room.id);
     this.rooms.delete(room.id);
     room.destroy();
-    log("debug", "room unloaded", { room: roomTag(room.id) });
+    log("debug", "room_unloaded", "room unloaded", { room: roomTag(room.id) });
   }
 
+  /** The expiry job (every 6 h): one line at start, one at the end with dur_ms and the number of rooms deleted. */
   async gc(): Promise<number> {
+    const t0 = performance.now();
+    log("info", "gc_start", "expiry of idle rooms", { ttl_days: this.limits.roomTtlDays });
     const n = await this.store.gc(this.limits.roomTtlDays, (id) => this.rooms.has(id));
     // forget creation timestamps older than an hour
     const now = Date.now();
@@ -459,14 +465,19 @@ export class RoomManager {
       if (keep.length) this.created.set(ip, keep);
       else this.created.delete(ip);
     }
-    if (n) log("info", "rooms expired", { deleted: n });
+    log("info", "gc_done", "expiry of idle rooms done", {
+      deleted: n,
+      stored: this.store.stored,
+      dur_ms: Math.round(performance.now() - t0),
+    });
     return n;
   }
 
   startGc(everyMs = 6 * 3600_000) {
-    void this.gc().catch((e) => log("error", "gc failed", { error: String(e) }));
+    void this.gc().catch((e) => log("error", "gc_failed", "expiry of idle rooms failed", errField(e)));
     this.gcTimer = setInterval(
-      () => void this.gc().catch((e) => log("error", "gc failed", { error: String(e) })),
+      () =>
+        void this.gc().catch((e) => log("error", "gc_failed", "expiry of idle rooms failed", errField(e))),
       everyMs,
     );
   }

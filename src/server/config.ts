@@ -78,6 +78,11 @@ function int(v: string | undefined, def: number, lo: number, hi: number): number
   return Number.isInteger(n) && n >= lo && n <= hi ? n : def;
 }
 
+/** The names of the config variables that are set (the startup line lists them, never their values). */
+export function configNamesSet(env: (k: string) => string | undefined = (k) => Deno.env.get(k)): string[] {
+  return ENV_VARS.filter((k) => env(k) !== undefined && env(k) !== "");
+}
+
 export function loadConfig(env: (k: string) => string | undefined = (k) => Deno.env.get(k)): Config {
   return {
     dataDir: env("APP_DATA_DIR") || "/data",

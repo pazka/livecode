@@ -12,6 +12,22 @@ dependencies never run on the box (Decision #17).
 | `image`: container smoke | the image runs hardened (uid 10001, read-only, no caps), `/healthz`, in-container `smoke`, a foreign Origin is refused, clean SIGTERM |
 | `image`: visual regression | every use case below at 1400 / 1024 / 390 px, compared with `visual/baseline/` |
 
+## Logs (hosh-management AGENTS.md section 11)
+
+`tests/log_test.ts` pins the format so it cannot rot: one JSON object per line on stdout with `ts`, `level`,
+`service` (`livecode`), `version` (the release tag), `event`, `msg`.
+- One `startup` line (port, `data_dir_writable`, the names of the config variables that are set, never their
+  values) and one `shutdown` line (signal, `dur_ms` of the final save).
+- Requests are not logged at `info` (Traefik has them): only a 5xx (`error`), a refused WebSocket origin
+  (403, `warn`) and anything slower than 1 s (`warn`). At `debug` every request, `/healthz` included.
+  Each line has `req_id` (the edge's `X-Request-Id` when it is a plain token, else generated, and always
+  returned in the `x-request-id` header), `method`, `route` (template: `/r/:room`, `/ws/:room`, `/:asset`…,
+  never the path or query string), `status`, `dur_ms`.
+- Error lines carry `err` (type, message, stack). A room id never reaches the log: `room` is a hash tag and
+  room file names in error messages are replaced by the tag.
+- The expiry job (every 6 h) writes `gc_start` and `gc_done` (`deleted`, `stored`, `dur_ms`).
+- Level: `APP_LOG_LEVEL` (this repo's name for the standard's `LOG_LEVEL`), default `info`.
+
 ## Visual use cases
 
 Harness: `visual/` (hosh-management `AGENTS.md` §3). `visual/run.sh <image>` starts the built image
