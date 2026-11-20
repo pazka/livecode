@@ -42,6 +42,7 @@ import {
 } from "./page.ts";
 import { startViewer } from "./viewer.ts";
 import { exportFileName } from "./compose.ts";
+import { formatFile } from "./autoformat.ts";
 
 const settings = new SettingsStore();
 
@@ -191,8 +192,45 @@ function startRoom(roomId: string) {
         if (file === current) $("sb-pos").textContent = `Ln ${line}, Col ${col}`;
       },
       (g) => texts[g].toString(),
+      { othersCarets: () => othersCarets(f), openAt: (t) => openAt(t) },
     ),
   ])) as Record<FileId, SharedEditor>;
+
+  // --- go to the code (gotodef.ts) and back ---
+  const jumps: { file: FileId; pos: number }[] = [];
+  /** The caret on a place of a file, in view (its tab opens); `remember`: "Go back" returns from it. */
+  function showPlace(file: FileId, pos: number) {
+    selectTab(file, true);
+    const view = editors[file].view;
+    const at = Math.max(0, Math.min(view.state.doc.length, pos));
+    view.dispatch({ selection: { anchor: at }, effects: EditorView.scrollIntoView(at, { y: "center" }) });
+    view.focus();
+    announce(`${FILE_NAMES[file]}, line ${view.state.doc.lineAt(at).number}`);
+  }
+  function openAt(t: { file: FileId; from: number }) {
+    jumps.push({ file: current, pos: editors[current].view.state.selection.main.head });
+    if (jumps.length > 50) jumps.shift();
+    showPlace(t.file, t.from);
+  }
+  function goBack() {
+    const j = jumps.pop();
+    if (!j) return announce("Nowhere to go back to");
+    showPlace(j.file, j.pos);
+  }
+
+  /** Where the other people's carets (and selection ends) are in a file: formatting leaves those lines. */
+  function othersCarets(f: FileId): number[] {
+    const out: number[] = [];
+    for (const [id, st] of awareness.getStates()) {
+      if (id === doc.clientID || isViewer(st)) continue;
+      for (const end of [st.cursor?.anchor, st.cursor?.head]) {
+        if (!end) continue;
+        const abs = Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(end), doc);
+        if (abs && abs.type === texts[f]) out.push(abs.index);
+      }
+    }
+    return out;
+  }
 
   let limitNoticeAt = 0;
   function onFileLimit(f: FileId) {
@@ -687,7 +725,18 @@ function startRoom(roomId: string) {
     open(viewerUrl(roomId), viewerTarget(roomId), "noopener");
   }
 
-  $("run-btn").addEventListener("click", runPreview);
+  /**
+   * Run as the person asks for it (Ctrl/Cmd+S, Ctrl/Cmd+Enter, the Run button, vim's :w): with "Format my
+   * code" on, the files they have on screen are formatted first (autoformat.ts), then the page runs. The
+   * formatter gets a moment (the TypeScript worker may still be starting); the page never waits longer.
+   */
+  function saveAndRun() {
+    if (!settings.get().autoFormat) return runPreview();
+    const jobs = settings.get().panes.map((f) => formatFile(editors[f].view));
+    Promise.race([Promise.allSettled(jobs), new Promise((r) => setTimeout(r, 700))]).then(runPreview);
+  }
+
+  $("run-btn").addEventListener("click", saveAndRun);
   $<HTMLInputElement>("auto-run").addEventListener("change", (e) => {
     const on = (e.target as HTMLInputElement).checked;
     previewPaused = false;
@@ -977,7 +1026,7 @@ function startRoom(roomId: string) {
     ].filter((x): x is HTMLElement => x !== null && x.getClientRects().length > 0);
 
   const app: Record<string, () => void> = {
-    run: runPreview,
+    run: saveAndRun,
     toggleAutoRun: () => {
       previewPaused = false;
       settings.update({ autoRun: !settings.get().autoRun });
@@ -1054,11 +1103,12 @@ function startRoom(roomId: string) {
     toggleWrap: () => settings.update({ lineWrap: !settings.get().lineWrap }),
     toggleAutoFormat: () => {
       settings.update({ autoFormat: !settings.get().autoFormat });
-      announce(`Format as you type ${settings.get().autoFormat ? "on" : "off"}`);
+      announce(`Format my code ${settings.get().autoFormat ? "on" : "off"}`);
     },
     fontBigger: () => settings.update({ fontSize: settings.get().fontSize + 1 }),
     fontSmaller: () => settings.update({ fontSize: settings.get().fontSize - 1 }),
     fontReset: () => settings.update({ fontSize: 14 }),
+    goBack,
     copyLink: () => {
       navigator.clipboard.writeText(location.href).then(
         () => {
@@ -1190,7 +1240,11 @@ function startRoom(roomId: string) {
   }, true);
 
   // --- vim: ex commands + user mappings ---
-  Vim.defineEx("write", "w", () => runPreview());
+  Vim.defineEx("write", "w", () => saveAndRun());
+  // gd: go to the code of the name under the cursor (mapped in applyVimrc: mapclear drops added keys)
+  Vim.defineAction("lcGotoDefinition", () => {
+    runCommand("gotoDefinition", editors[current].view);
+  });
   Vim.defineEx("edit", "e", (_cm: unknown, params: { args?: string[] }) => {
     const a = (params.args?.[0] ?? "").toLowerCase();
     const f = a.startsWith("c") ? "css" : a.startsWith("j") ? "js" : a.startsWith("h") ? "html" : null;
@@ -1199,6 +1253,9 @@ function startRoom(roomId: string) {
   function applyVimrc(src: string) {
     try {
       Vim.mapclear();
+    } catch { /* older API */ }
+    try {
+      Vim.mapCommand("gd", "action", "lcGotoDefinition", {}, { context: "normal" });
     } catch { /* older API */ }
     const bad: number[] = [];
     src.split("\n").forEach((line, i) => {
@@ -1297,6 +1354,11 @@ function startRoom(roomId: string) {
         h("dd", { text: "Add a cursor (click again on it to remove it)" }),
         h("dt", { text: displayMouse(preset.mouse.column, "Drag") }),
         h("dd", { text: "Column (box) selection: one cursor per line" }),
+        h("dt", { text: displayMouse(preset.mouse.goto, "Click") }),
+        h("dd", {
+          text: "On a name: go to its code — a function or variable of the script, a class or an id " +
+            "across the three files",
+        }),
       ),
     );
   }

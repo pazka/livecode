@@ -60,7 +60,12 @@ Deno.test("mouse: modifiers match exactly (Mod = Cmd on macOS, Ctrl elsewhere)",
 Deno.test("mouse: every preset's add-cursor and column gestures differ (a click never means both)", () => {
   for (const p of PRESETS) assert(p.mouse.addCursor !== p.mouse.column, p.id);
   const vscode = PRESETS.find((p) => p.id === "vscode")!;
-  assertEquals(vscode.mouse, { addCursor: "Alt", column: "Alt-Shift" });
+  assertEquals(vscode.mouse, { addCursor: "Alt", column: "Alt-Shift", goto: "Mod" });
   const jb = PRESETS.find((p) => p.id === "jetbrains")!;
-  assertEquals(jb.mouse, { addCursor: "Alt-Shift", column: "Alt" });
+  assertEquals(jb.mouse, { addCursor: "Alt-Shift", column: "Alt", goto: "Mod" });
+  // "go to the code" is Ctrl/⌘+click, except where that is the editor's own "add a cursor": Alt+click there
+  for (const p of PRESETS) {
+    assertEquals(p.mouse.goto, p.mouse.addCursor === "Mod" ? "Alt" : "Mod", p.id);
+    assert(p.mouse.goto !== p.mouse.addCursor, p.id);
+  }
 });

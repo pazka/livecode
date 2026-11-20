@@ -782,7 +782,14 @@ Deno.test({
           const now = await a!.evaluate(() => (globalThis as any).__livecode.renders());
           throw new Error(`${(e as Error).message} (renders ${n} → ${now}; keys ${await keyTrace(a!)})`);
         }
-        await expectText(a!, "html", PAGE, "no newline typed");
+        // Run formats the file first (newer releases: the lines get their indentation): no newline typed,
+        // nothing else changed
+        await expectText(
+          a!,
+          "html",
+          (t) => t.split("\n").map((l) => l.trimStart()).join("\n") === PAGE,
+          "no newline typed",
+        );
       });
 
       // ----- JetBrains -----

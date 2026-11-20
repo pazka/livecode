@@ -60,6 +60,7 @@ import { tsClient, tsCompletionSource, typescriptEditor, typescriptSupport } fro
 import { renameExtension } from "./rename.ts";
 import { type MouseMods, mouseMods } from "./keys.ts";
 import { autoFormat } from "./autoformat.ts";
+import { gotoDefinitionConfig, gotoMouse, type Target } from "./gotodef.ts";
 
 /** The script's language, shared by the room (meta "jsLang"). */
 export type ScriptLang = "js" | "ts";
@@ -212,6 +213,10 @@ export interface EditorOptions {
 export interface FileOptions {
   /** The script's language (the room's switch); other files ignore it. */
   scriptLang?: ScriptLang;
+  /** Where the other people's carets are in this file (formatting leaves their lines alone). */
+  othersCarets?: () => number[];
+  /** Shows a place of one of the files (go to the code: gotodef.ts). */
+  openAt?: (t: Target) => void;
 }
 
 export class SharedEditor {
@@ -222,6 +227,7 @@ export class SharedEditor {
   private readonly lang = new Compartment();
   private readonly format = new Compartment();
   private scriptLang: ScriptLang;
+  private readonly othersCarets: () => number[];
 
   constructor(
     readonly file: FileId,
@@ -235,6 +241,7 @@ export class SharedEditor {
     fileOpts: FileOptions = {},
   ) {
     this.scriptLang = fileOpts.scriptLang ?? "js";
+    this.othersCarets = fileOpts.othersCarets ?? (() => []);
     const state = EditorState.create({
       doc: ytext.toString(),
       extensions: [
@@ -262,7 +269,13 @@ export class SharedEditor {
         this.lang.of(languageExtension(file, this.scriptLang, texts)),
         this.tabs.of(tabExtension(opts.tabSize)),
         this.wrap.of(opts.lineWrap ? EditorView.lineWrapping : []),
-        this.format.of(autoFormat(opts.autoFormat)),
+        this.format.of(this.formatExtension(opts.autoFormat)),
+        gotoDefinitionConfig({
+          file,
+          lang: () => this.scriptLang,
+          texts,
+          open: fileOpts.openAt ?? (() => {}),
+        }),
         yCollab(ytext, awareness, { undoManager: false }),
         crowdedNames,
         errorDisplay,
@@ -286,8 +299,22 @@ export class SharedEditor {
         this.modal.reconfigure(modalExtension(opts.keymap)),
         this.tabs.reconfigure(tabExtension(opts.tabSize)),
         this.wrap.reconfigure(opts.lineWrap ? EditorView.lineWrapping : []),
-        this.format.reconfigure(autoFormat(opts.autoFormat)),
+        this.format.reconfigure(this.formatExtension(opts.autoFormat)),
       ],
+    });
+  }
+
+  /**
+   * How this file is formatted (autoformat.ts): the script by TypeScript's formatter (JavaScript too — the
+   * worker starts when the first format is asked), the stylesheet with its spaces, the HTML by indentation.
+   */
+  private formatExtension(asTyped: boolean): Extension {
+    return autoFormat(asTyped, {
+      css: this.file === "css",
+      deep: this.file === "js"
+        ? (text, indent) => tsClient().call("format", text, this.scriptLang, indent)
+        : undefined,
+      others: this.othersCarets,
     });
   }
 
@@ -348,8 +375,10 @@ function addCaretClick(e: MouseEvent, view: EditorView): boolean {
  * Multiple cursors with the mouse: a click with the preset's modifier adds a cursor (Mod+click too, in every
  * preset), a drag with its column modifier selects a column (a box, one cursor per line).
  */
-function mouseExtension(m: { addCursor: MouseMods; column: MouseMods }): Extension {
+function mouseExtension(m: { addCursor: MouseMods; column: MouseMods; goto: MouseMods }): Extension {
   return [
+    // a click with the preset's "go to the code" gesture on a name (gotodef.ts); else the click as below
+    gotoMouse(m.goto),
     EditorView.clickAddsSelectionRange.of((e) => mouseMods(e, m.addCursor) || mouseMods(e, "Mod")),
     // with Shift in the gesture (JetBrains Alt+Shift+click), CodeMirror would extend the selection instead:
     // add (or, on an existing caret, remove) the caret here ourselves

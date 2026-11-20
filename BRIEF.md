@@ -145,6 +145,43 @@ jetbrains, vscode, etc.) and keymaps customisable quickly."*
    screen readers; Escape closes it. On the first lines of a file the box (and the type's box) opens under
    the code, never over the file buttons above the editor.
 24. The **Settings** button is a gear (it was a sun-like circle with rays, read as a theme switch).
+25. **Real formatting, on Run / Ctrl+S too** (owner, 2026-11-14: *"I don't see the auto format activate on
+   typescript … I would have liked it to format when hitting ctrl+s, so the save shortcut and/or when I'm
+   typing … bracket, inner spacing etc. to be formatted too"* — feature 22 only re-indented the lines a person
+   touched). Now, with "Format my code" on (per person, on by default):
+   - **Run** (Ctrl/Cmd+S, Ctrl/Cmd+Enter, the Run button, vim `:w`) first formats the **whole** of each file
+     the person has on screen, then runs the page. One undo step per file.
+   - **The script (JavaScript and TypeScript)** is formatted by TypeScript's own formatter, in the worker (no
+     new dependency; a JavaScript room starts the worker at its first format): `x:number` → `x: number`,
+     `if(a>1){` → `if (a > 1) {`, `{a:1,b:2}` → `{ a: 1, b: 2 }`, `f(1,2)` → `f(1, 2)`, indentation, trailing
+     spaces. Lines are never joined or wrapped; quotes, semicolons and template strings stay as written.
+   - **The stylesheet**: `a{color:red;margin:0}` → `a { color: red; margin: 0 }` (one space before `{`, after
+     `:` and `;`, inside a one-line block), indentation. **The HTML**: indentation (as before).
+   - **As the person types**, the lines they changed get the same formatting once the caret has left them
+     (the line being written only gets its indentation — never its spacing or the space just typed).
+   - The "Format file" command (Shift+Alt+F …) does the same as Run's formatting for its file.
+   - Shared code: a line holding someone else's cursor is never formatted from here (by Run either).
+   Build: `deno bundle --minify` can break the CommonJS helper of a bundle depending on the names the
+   minifier picks ("$1 is not defined": the TypeScript worker would not start) — `scripts/embed.ts` repairs
+   it (`scripts/bundlefix.ts`, unit-tested) before embedding.
+
+26. **Go to the code** (owner, 2026-11-15: *"the ability to go to the code when I click on a reference with the
+   usual control, it can be cmd click or alt click depending on the keymap and mac or windows machine"*):
+   - **Mouse, as in each editor**: VS Code and JetBrains **Ctrl+click** (⌘+click on a Mac); Sublime, Vim and
+     Emacs **Alt+click** (⌥+click) — there Ctrl/⌘+click is the editor's own "add a cursor". While the key is
+     held, the name under the mouse is underlined. Keyboard help lists the gesture of the current keymap.
+   - **Keyboard** ("Go to the code of the name at the cursor", bindable): VS Code and Sublime **F12**,
+     JetBrains **Ctrl/⌘+B**, Emacs **M-.**, Vim **gd**.
+   - **The script (JavaScript or TypeScript)**: the TypeScript service finds the declaration of a function,
+     variable, class, type, property or parameter. On the declaration itself: its next use (they cycle). The
+     browser's own names (`document`, `Math` …) have no code here: a message says so.
+   - **Across the three files**: a class or an id in a selector of the script (`querySelector(".card")`,
+     `getElementById("out")`, `classList.add("on")`) or of the stylesheet goes to the element in the HTML;
+     `class="…"` / `id="…"` (also `for`, `href="#…"`, `aria-controls` …) in the HTML goes to the stylesheet's
+     rule, else to the script that names it; `var(--gap)` goes to where `--gap` is set.
+   - **Go back** returns to where the jump started (VS Code Alt+← / Mac Ctrl+-, JetBrains Ctrl/⌘+Alt+←, Sublime
+     Alt+- / Mac Ctrl+-, Emacs M-,; in the palette).
+   - A Ctrl/⌘+click that leads nowhere (empty space, a number) still adds a cursor, as before (feature 18).
 
 ## Stack (Decision #17 deps approved by the owner, 2026-11-04; typescript 2026-11-06)
 Deno 2.9 (compiled single binary, distroless, uid 10001). yjs + y-protocols (+ lib0), CodeMirror 6,

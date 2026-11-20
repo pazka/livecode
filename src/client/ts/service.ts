@@ -75,6 +75,23 @@ export type RenameResult =
   }
   | { ok: false; message: string };
 
+/** Where "go to definition" leads from a place of the script. */
+export type DefinitionResult =
+  /** The name's declaration, in the script. */
+  | { kind: "definition"; from: number; to: number }
+  /** The place asked about is the declaration itself: every other use of the name, in order. */
+  | { kind: "uses"; ranges: { from: number; to: number }[] }
+  /** Declared outside the script: the browser's own (`document`, `Math` …) or a module from a URL. */
+  | { kind: "library"; name: string }
+  | null;
+
+/** One change of a formatting: `insert` replaces the text from `from` to `to`. */
+export interface TextEdit {
+  from: number;
+  to: number;
+  insert: string;
+}
+
 export interface Transpiled {
   js: string;
   /** Source map (v3) of `js` back to the TypeScript text. */
@@ -157,15 +174,61 @@ export class ScriptService {
    * Rename the symbol at `pos`: every place it is used in the script (scope-aware: another `x` elsewhere is
    * not touched), or why it can't be renamed (a keyword, something of the browser's own types …).
    */
+  /** The file `text` is read as: the TypeScript script, or the JavaScript one (never type-checked). */
+  private fileOf(text: string, lang: "ts" | "js"): string {
+    if (lang === "ts") {
+      this.use(text);
+      return SCRIPT;
+    }
+    if (text !== this.jsText) {
+      this.jsText = text;
+      this.jsVersion++;
+    }
+    return SCRIPT_JS;
+  }
+
+  /**
+   * The script formatted by TypeScript's own formatter (JavaScript too): indentation, a space around
+   * operators, after commas, colons and keywords, inside braces; trailing spaces removed. Lines are never
+   * joined, split or wrapped, quotes and semicolons stay as written, template strings are untouched.
+   * Returns the changes to make, in order.
+   */
+  format(text: string, lang: "ts" | "js" = "ts", indent = 2): TextEdit[] {
+    const file = this.fileOf(text, lang);
+    const size = Math.max(1, Math.min(8, Math.round(indent) || 2));
+    const edits = this.ls.getFormattingEditsForDocument(file, {
+      ...this.ts.getDefaultFormatCodeSettings("\n"),
+      indentSize: size,
+      tabSize: size,
+      convertTabsToSpaces: true,
+      trimTrailingWhitespace: true,
+      semicolons: this.ts.SemicolonPreference.Ignore,
+    });
+    return edits
+      .map((e) => ({ from: e.span.start, to: e.span.start + e.span.length, insert: e.newText }))
+      .sort((a, b) => a.from - b.from);
+  }
+
+  /** The declaration of the name at `pos` — or, on the declaration itself, its other uses. */
+  definition(text: string, pos: number, lang: "ts" | "js" = "ts"): DefinitionResult {
+    const file = this.fileOf(text, lang);
+    const defs = this.ls.getDefinitionAtPosition(file, pos);
+    if (!defs?.length) return null;
+    const own = defs.filter((d) => d.fileName === file);
+    if (!own.length) return { kind: "library", name: defs[0].name };
+    const span = (s: TS.TextSpan) => ({ from: s.start, to: s.start + s.length });
+    const here = own.find((d) => d.textSpan.start <= pos && pos <= d.textSpan.start + d.textSpan.length);
+    if (!here) return { kind: "definition", ...span(own[0].textSpan) };
+    const ranges = (this.ls.getReferencesAtPosition(file, pos) ?? [])
+      .filter((r) => r.fileName === file)
+      .map((r) => span(r.textSpan))
+      .filter((r) => !(r.from <= pos && pos <= r.to))
+      .sort((a, b) => a.from - b.from);
+    return { kind: "uses", ranges };
+  }
+
   rename(text: string, pos: number, lang: "ts" | "js" = "ts"): RenameResult {
-    let file = SCRIPT;
-    if (lang === "js") {
-      file = SCRIPT_JS;
-      if (text !== this.jsText) {
-        this.jsText = text;
-        this.jsVersion++;
-      }
-    } else this.use(text);
+    const file = this.fileOf(text, lang);
     const info = this.ls.getRenameInfo(file, pos, { allowRenameOfImportPath: false });
     if (!info.canRename) return { ok: false, message: info.localizedErrorMessage };
     const locs = this.ls.findRenameLocations(file, pos, false, false, {

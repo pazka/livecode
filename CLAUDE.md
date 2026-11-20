@@ -58,6 +58,8 @@ an app that follows it deploys first try. Values already fixed for this project:
   full report (build, lint, check, tests, e2e) as artifacts.
 - Pure modules have unit tests (`tests/`): keys/keymaps (every preset conflict-free on PC and Mac),
   loop guard, preview composition, themes (WCAG contrast of every theme), TypeScript service + source maps.
+- Build: `scripts/embed.ts` repairs a `deno bundle --minify` bug (`scripts/bundlefix.ts`: "$1 is not defined",
+  the TypeScript worker would not load) — keep it; the TypeScript e2e is what catches a broken worker.
 - TypeScript (feature 14): `src/client/ts/` runs in `/ts-worker.js` (bundled separately, embedded gzip-only);
   its lib files come from the pinned package at build time (`deno task tslibs` → `libs.gen.ts`, gitignored). Server: real-socket integration
   tests. `e2e/` drives two Chromium windows in one room.
